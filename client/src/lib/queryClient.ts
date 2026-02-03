@@ -65,7 +65,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const url = queryKey[0] as string;
+    // Join queryKey parts to form the full URL (e.g., ["/api/roles", "123"] -> "/api/roles/123")
+    const url = queryKey.filter(part => part != null).join("/").replace(/\/+/g, "/");
     
     const res = await fetch(url, {
       credentials: "include",
