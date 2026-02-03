@@ -6,7 +6,7 @@ import { createIAMRole, updateIAMRole, deleteIAMRole } from "./aws/iam";
 import { grantLakeFormationPermissions, revokeLakeFormationPermissions, updateLakeFormationPermissions } from "./aws/lakeformation";
 import { getDataSourceSchemas, getDataSourceColumns } from "./aws/glue";
 import { executeQuery } from "./aws/athena";
-import { authMiddleware, adminMiddleware, validateDataSourceAccess, type AuthenticatedRequest } from "./middleware/auth";
+import { authMiddleware, adminMiddleware, validateDataSourceAccess, getRowFilters, buildRowFilterWhereClause, type AuthenticatedRequest } from "./middleware/auth";
 import { insertRoleSchema, insertUserSchema, DATA_SOURCES, type DataSourcePermission } from "@shared/schema";
 import { z } from "zod";
 
@@ -405,7 +405,41 @@ export async function registerRoutes(
         });
       }
 
-      const result = await executeQuery(sql, dataSourceId);
+      const tableName = dataSource.tableName;
+      const { allRows, filters } = getRowFilters(req, dataSourceId, tableName);
+      
+      let modifiedSql = sql;
+      if (!allRows && filters.length > 0) {
+        const rowFilterClause = buildRowFilterWhereClause(filters);
+        if (rowFilterClause) {
+          const normalizedSql = sql.replace(/\s+/g, ' ');
+          const upperSql = normalizedSql.toUpperCase();
+          
+          const whereMatch = upperSql.match(/\sWHERE\s/i);
+          const groupByMatch = upperSql.match(/\sGROUP\s+BY\s/i);
+          const orderByMatch = upperSql.match(/\sORDER\s+BY\s/i);
+          const limitMatch = upperSql.match(/\sLIMIT\s/i);
+          
+          const whereIndex = whereMatch ? upperSql.indexOf(whereMatch[0]) : -1;
+          const groupByIndex = groupByMatch ? upperSql.indexOf(groupByMatch[0]) : -1;
+          const orderByIndex = orderByMatch ? upperSql.indexOf(orderByMatch[0]) : -1;
+          const limitIndex = limitMatch ? upperSql.indexOf(limitMatch[0]) : -1;
+          
+          if (whereIndex !== -1 && whereMatch) {
+            const afterWhere = whereIndex + whereMatch[0].length;
+            modifiedSql = normalizedSql.slice(0, afterWhere) + `(${rowFilterClause}) AND (` + normalizedSql.slice(afterWhere) + ")";
+          } else {
+            let insertPosition = normalizedSql.length;
+            if (groupByIndex !== -1) insertPosition = Math.min(insertPosition, groupByIndex);
+            if (orderByIndex !== -1) insertPosition = Math.min(insertPosition, orderByIndex);
+            if (limitIndex !== -1) insertPosition = Math.min(insertPosition, limitIndex);
+            
+            modifiedSql = normalizedSql.slice(0, insertPosition) + ` WHERE ${rowFilterClause}` + normalizedSql.slice(insertPosition);
+          }
+        }
+      }
+
+      const result = await executeQuery(modifiedSql, dataSourceId);
       res.json(result);
     } catch (error) {
       console.error("Query execution error:", error);
