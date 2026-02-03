@@ -1,4 +1,5 @@
-import type { Request, Response, NextFunction, ParamsDictionary } from "express";
+import type { Request, Response, NextFunction } from "express";
+import type { ParamsDictionary } from "express-serve-static-core";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { storage } from "../storage";
 import type { User, Role } from "@shared/schema";
