@@ -70,8 +70,10 @@ export default function DataViewerPage() {
   const generatedSql = useMemo(() => {
     if (!selectedDataSource || selectedColumns.length === 0) return "";
     
+    const dataSource = DATA_SOURCES.find(ds => ds.id === selectedDataSource);
+    const tableName = dataSource?.tableName || selectedDataSource.replace("-data-db", "");
     const cols = selectedColumns.join(", ");
-    let sql = `SELECT ${cols}\nFROM ${selectedDataSource.replace("-data-db", "")}`;
+    let sql = `SELECT ${cols}\nFROM ${tableName}`;
     
     if (filters.length > 0) {
       const whereClause = filters

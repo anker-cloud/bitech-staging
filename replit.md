@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is an enterprise data access platform that provides role-based access control for querying AWS data sources. The application enables administrators to manage users and roles with granular permissions to different data sources (Crime, Events, Traffic, Weather, Insurance), while regular users can query data through either a visual query builder or custom SQL interface. The system integrates with AWS services including Cognito for authentication, Athena for query execution, Glue for schema discovery, Lake Formation for permissions, and IAM for role management.
+This is an enterprise data access platform that provides role-based access control for querying AWS data sources. The application enables administrators to manage users and roles with granular permissions to different data sources (Crime, Events, Traffic, Weather), while regular users can query data through either a visual query builder or custom SQL interface. The system integrates with AWS services including Cognito for authentication, Athena for query execution, Glue for schema discovery, Lake Formation for permissions, and IAM for role management.
 
 ## User Preferences
 
@@ -66,5 +66,18 @@ Preferred communication style: Simple, everyday language.
 - `ATHENA_OUTPUT_LOCATION` - S3 bucket for query results
 - `DEMO_MODE` - Set to "true" to bypass AWS integrations
 
-### Demo Mode
-When AWS credentials are not configured or `DEMO_MODE=true`, the application uses mock implementations for all AWS services, returning sample data and simulating authentication without actual AWS calls.
+### Hybrid Mode (Current Configuration)
+The platform operates in hybrid mode:
+- **Authentication**: Demo mode (`DEMO_MODE=true`) - Uses demo tokens due to AWS Cognito ADMIN_USER_PASSWORD_AUTH not being enabled on the user pool client
+- **Data Operations**: Real AWS services - Glue for schema discovery, Athena for query execution, S3 for result storage
+
+### AWS Glue Catalog Structure
+The platform connects to the following real AWS Glue databases and tables:
+- `crime-data-db` → `crime_data_prd_silver` (columns: location, latitude, longitude, postal_code, city_name, date_time, title, link, description)
+- `events-data-db` → `event_data_prd_silver`
+- `traffic-data-db` → `traffic_data_prd_silver`
+- `weather-data-db` → `weather_data_prd_silver`
+
+### Athena Configuration
+- Output Location: `s3://bitech-pbac-data-prd/athena-post-op/`
+- Workgroup: Uses default settings from AWS account
