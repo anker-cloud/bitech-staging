@@ -80,6 +80,7 @@ The platform operates in hybrid mode:
 The platform connects to the following real AWS Glue databases and tables:
 - `crime-data-db` → `crime_data_prd_silver` (columns: location, latitude, longitude, postal_code, city_name, date_time, title, link, description)
 - `events-data-db` → `event_data_prd_silver`
+- `insurance-data-db` → `policy_claims_data_silver` (columns: policyholder_id, first_name, last_name, claim_id, claim_cause, claim_amount_net_eur, policy_id, policy_status, coverage_type, risk_class, and many more)
 - `traffic-data-db` → `traffic_data_prd_silver`
 - `weather-data-db` → `weather_data_prd_silver`
 
