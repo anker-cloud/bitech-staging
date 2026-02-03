@@ -100,7 +100,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <div className="relative flex items-center">
+                          <div className="relative">
                             <Input
                               type={showPassword ? "text" : "password"}
                               placeholder="Enter your password"
@@ -109,20 +109,18 @@ export default function LoginPage() {
                               className="pr-10"
                               {...field}
                             />
-                            <Button
+                            <button
                               type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                               onClick={() => setShowPassword(!showPassword)}
                               data-testid="button-toggle-password"
                             >
                               {showPassword ? (
-                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                <EyeOff className="h-4 w-4" />
                               ) : (
-                                <Eye className="h-4 w-4 text-muted-foreground" />
+                                <Eye className="h-4 w-4" />
                               )}
-                            </Button>
+                            </button>
                           </div>
                         </FormControl>
                         <FormMessage />
