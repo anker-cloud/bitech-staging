@@ -53,7 +53,7 @@ export default function DataViewerPage() {
   }, [user]);
 
   const { data: tableColumns, isLoading: isLoadingColumns } = useQuery<TableColumn[]>({
-    queryKey: ["/api/data-sources", selectedDataSource, "columns"],
+    queryKey: [`/api/data-sources/${selectedDataSource}/columns`],
     enabled: !!selectedDataSource,
   });
 
