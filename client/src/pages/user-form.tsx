@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { Users, ArrowLeft, Loader2, Check, X, Eye, EyeOff } from "lucide-react";
+import { Users, ArrowLeft, Loader2, Check, X, Eye, EyeOff, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -155,14 +155,21 @@ export default function UserFormPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="john@example.com"
-                  data-testid="input-user-email"
-                />
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <div className="absolute left-10 top-1/2 -translate-y-1/2 h-5 w-px bg-border" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="john@example.com"
+                    className="pl-12 h-11 rounded-lg"
+                    data-testid="input-user-email"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -170,28 +177,28 @@ export default function UserFormPage() {
                   Password {isEditing ? "(leave blank to keep current)" : "*"}
                 </Label>
                 <div className="relative">
+                  <button
+                    type="button"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                    data-testid="button-toggle-password-visibility"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                  <div className="absolute left-10 top-1/2 -translate-y-1/2 h-5 w-px bg-border" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={isEditing ? "Enter new password" : "Minimum 8 characters"}
+                    className="pl-12 h-11 rounded-lg"
                     data-testid="input-user-password"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowPassword(!showPassword)}
-                    data-testid="button-toggle-password-visibility"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
                 </div>
               </div>
 
