@@ -23,6 +23,34 @@ export default function ApiDocsPage() {
   };
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dc4ai.replit.app';
+  
+  // Detect environment based on URL pattern
+  const isProduction = baseUrl.includes('.replit.app');
+  
+  // Generate staging URL from production or use current URL
+  const getDevUrl = () => {
+    if (isProduction) {
+      // Transform production URL to dev pattern
+      const appName = baseUrl.replace('https://', '').replace('.replit.app', '');
+      return `https://${appName}.replit.dev`;
+    }
+    return baseUrl;
+  };
+  
+  // Generate production URL from dev or use current URL
+  const getProdUrl = () => {
+    if (isProduction) {
+      return baseUrl;
+    }
+    // Transform dev URL to production pattern
+    // Pattern: workspace-00-user.janeway.replit.dev -> workspace-user.replit.app
+    return baseUrl
+      .replace(/-00-/g, '-')
+      .replace(/\.[\w]+\.replit\.dev/, '.replit.app');
+  };
+  
+  const stagingUrl = getDevUrl();
+  const productionUrl = getProdUrl();
 
   const curlExample = `curl -X GET "${baseUrl}/api/v1/fetch?columns=city_name,title&limit=10" \\
   -H "x-api-key: dc4ai_your-api-key-here" \\
@@ -142,7 +170,7 @@ console.log(data);`;
                       <Badge variant="outline">Staging</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      {baseUrl}
+                      {stagingUrl}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -150,7 +178,7 @@ console.log(data);`;
                       <Badge variant="secondary">Production</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      {baseUrl.replace('-00-', '-').replace('.janeway.replit.dev', '.replit.app')}
+                      {productionUrl}
                     </TableCell>
                   </TableRow>
                 </TableBody>
