@@ -142,7 +142,7 @@ console.log(data);`;
                       <Badge variant="outline">Staging</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      https://dc4ai-staging.replit.app
+                      {baseUrl}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -150,7 +150,7 @@ console.log(data);`;
                       <Badge variant="secondary">Production</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      https://dc4ai.replit.app
+                      {baseUrl.replace('-00-', '-').replace('.janeway.replit.dev', '.replit.app')}
                     </TableCell>
                   </TableRow>
                 </TableBody>
