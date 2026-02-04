@@ -6,6 +6,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  canGenerateApiKeys: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         isAdmin: user?.isAdmin ?? false,
+        canGenerateApiKeys: user?.role?.canGenerateApiKeys ?? false,
         login,
         logout,
       }}

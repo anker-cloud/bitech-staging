@@ -38,6 +38,7 @@ export default function RoleFormPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canGenerateApiKeys, setCanGenerateApiKeys] = useState(false);
   const [permissions, setPermissions] = useState<DataSourcePermission[]>(
     DATA_SOURCES.map((ds) => ({
       dataSourceId: ds.id,
@@ -60,6 +61,7 @@ export default function RoleFormPage() {
       setName(existingRole.name);
       setDescription(existingRole.description || "");
       setIsAdmin(existingRole.isAdmin);
+      setCanGenerateApiKeys(existingRole.canGenerateApiKeys || false);
       if (existingRole.permissions) {
         setPermissions(
           DATA_SOURCES.map((ds) => {
@@ -72,7 +74,7 @@ export default function RoleFormPage() {
   }, [existingRole]);
 
   const saveMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string; isAdmin: boolean; permissions: DataSourcePermission[] }) => {
+    mutationFn: async (data: { name: string; description: string; isAdmin: boolean; canGenerateApiKeys: boolean; permissions: DataSourcePermission[] }) => {
       if (isEditing) {
         return await apiRequest("PATCH", `/api/roles/${id}`, data);
       } else {
@@ -229,7 +231,7 @@ export default function RoleFormPage() {
       });
       return;
     }
-    saveMutation.mutate({ name: name.trim(), description: description.trim(), isAdmin, permissions });
+    saveMutation.mutate({ name: name.trim(), description: description.trim(), isAdmin, canGenerateApiKeys, permissions });
   };
 
   if (isEditing && isLoadingRole) {
@@ -293,6 +295,20 @@ export default function RoleFormPage() {
                   checked={isAdmin}
                   onCheckedChange={setIsAdmin}
                   data-testid="switch-is-admin"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="api-key-toggle">API Key Generation Access</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Users with this role can generate API keys for data access
+                  </p>
+                </div>
+                <Switch
+                  id="api-key-toggle"
+                  checked={canGenerateApiKeys}
+                  onCheckedChange={setCanGenerateApiKeys}
+                  data-testid="switch-can-generate-api-keys"
                 />
               </div>
             </CardContent>

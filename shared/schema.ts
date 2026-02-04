@@ -39,6 +39,7 @@ export const roles = pgTable("roles", {
   name: text("name").notNull().unique(),
   description: text("description"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  canGenerateApiKeys: boolean("can_generate_api_keys").notNull().default(false),
   permissions: jsonb("permissions").$type<DataSourcePermission[]>().notNull().default([]),
   iamRoleArn: text("iam_role_arn"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

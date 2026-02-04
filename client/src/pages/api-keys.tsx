@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Key, Plus, Trash2, Copy, Check, AlertCircle } from "lucide-react";
+import { Key, Plus, Trash2, Copy, Check, AlertCircle, Lock } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,9 @@ export default function ApiKeysPage() {
   const [copied, setCopied] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { canGenerateApiKeys, isAdmin } = useAuth();
+  
+  const hasApiKeyAccess = canGenerateApiKeys || isAdmin;
 
   const { data: apiKeys, isLoading } = useQuery<ApiKeyResponse[]>({
     queryKey: ["/api/api-keys"],
@@ -134,8 +138,15 @@ export default function ApiKeysPage() {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-create-api-key">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button 
+                data-testid="button-create-api-key"
+                disabled={!hasApiKeyAccess}
+              >
+                {hasApiKeyAccess ? (
+                  <Plus className="h-4 w-4 mr-2" />
+                ) : (
+                  <Lock className="h-4 w-4 mr-2" />
+                )}
                 Generate New Key
               </Button>
             </DialogTrigger>
@@ -216,6 +227,20 @@ export default function ApiKeysPage() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {!hasApiKeyAccess && (
+          <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+            <CardContent className="flex items-center gap-3 py-4">
+              <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">API Key Generation Restricted</p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Your role does not have permission to generate API keys. Contact an administrator to request access.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
