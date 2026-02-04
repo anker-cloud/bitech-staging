@@ -31,6 +31,7 @@ Preferred communication style: Simple, everyday language.
   - `roles` - Role definitions with JSON permissions for data source access
   - `users` - User accounts linked to roles and Cognito
   - `queryHistory` - Audit log of executed queries
+  - `apiKeys` - API keys for programmatic data access (SHA256 hashed, revocable)
 
 ### Authentication Flow
 1. User submits credentials to `/api/auth/login`
@@ -87,3 +88,21 @@ The platform connects to the following real AWS Glue databases and tables:
 ### Athena Configuration
 - Output Location: `s3://bitech-pbac-data-prd/athena-post-op/`
 - Workgroup: Uses default settings from AWS account
+
+### Public REST API
+The platform provides a public REST API for programmatic data access:
+- **Endpoint**: `GET /api/v1/fetch`
+- **Authentication**: `x-api-key` header with API key generated from the API Keys page
+- **Headers**:
+  - `x-api-key` (required) - API key for authentication
+  - `x-data-source` (required) - Database name (crime-data-db, events-data-db, insurance-data-db, traffic-data-db, weather-data-db)
+  - `Accept` - Response format: `application/json` (default) or `text/csv`
+- **Query Parameters**:
+  - `columns` - Comma-separated column names (optional, returns all allowed columns if omitted)
+  - `limit` - Max rows to return (default: 100, max: 1000)
+  - Any other parameter is treated as an equals filter (e.g., `city_name=Berlin`)
+- **Security**:
+  - API keys are SHA256 hashed in the database
+  - Keys inherit the user's role permissions (column/row restrictions apply)
+  - Keys can be revoked at any time from the API Keys page
+- **Note**: Athena does not support OFFSET, so pagination is limited to LIMIT only

@@ -238,17 +238,16 @@ export default function ApiKeysPage() {
               <p><strong>Headers:</strong></p>
               <ul className="list-disc list-inside ml-4 space-y-1">
                 <li><code className="bg-muted px-1 rounded">x-api-key</code> - Your API key (required)</li>
-                <li><code className="bg-muted px-1 rounded">x-data-source</code> - Database name (required)</li>
-                <li><code className="bg-muted px-1 rounded">x-table</code> - Table name (optional, uses default table)</li>
-                <li><code className="bg-muted px-1 rounded">Accept</code> - Response format: <code>application/json</code> or <code>text/csv</code></li>
+                <li><code className="bg-muted px-1 rounded">x-data-source</code> - Database name (required). Available: crime-data-db, events-data-db, insurance-data-db, traffic-data-db, weather-data-db</li>
+                <li><code className="bg-muted px-1 rounded">Accept</code> - Response format: <code>application/json</code> (default) or <code>text/csv</code></li>
               </ul>
               <p className="mt-2"><strong>Query Parameters:</strong></p>
               <ul className="list-disc list-inside ml-4 space-y-1">
-                <li><code className="bg-muted px-1 rounded">columns</code> - Comma-separated column names</li>
-                <li><code className="bg-muted px-1 rounded">limit</code> - Max rows to return (default: 100)</li>
-                <li><code className="bg-muted px-1 rounded">offset</code> - Skip rows for pagination</li>
-                <li>Any other parameter is treated as a filter (e.g., <code>city_name=Berlin</code>)</li>
+                <li><code className="bg-muted px-1 rounded">columns</code> - Comma-separated column names (optional, returns all allowed columns if omitted)</li>
+                <li><code className="bg-muted px-1 rounded">limit</code> - Max rows to return (default: 100, max: 1000)</li>
+                <li>Any other parameter is treated as an equals filter (e.g., <code>city_name=Berlin</code>)</li>
               </ul>
+              <p className="mt-2 text-xs">Note: Your API key inherits the permissions of your user role. Column and row-level restrictions apply.</p>
             </div>
           </CardContent>
         </Card>
