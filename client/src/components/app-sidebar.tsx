@@ -1,4 +1,4 @@
-import { Database, Users, Shield, LogOut, Key } from "lucide-react";
+import { Database, Users, Shield, LogOut, Key, BookOpen } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -114,6 +114,23 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
+
+      <div className="mt-auto border-t">
+        <SidebarMenu className="p-2">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location === "/api-docs"}
+              data-testid="nav-api-documentation"
+            >
+              <Link href="/api-docs">
+                <BookOpen className="h-4 w-4" />
+                <span>API Documentation</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </div>
 
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3 rounded-md bg-sidebar-accent p-3">

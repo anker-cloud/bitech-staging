@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import LoginPage from "@/pages/login";
 import DataViewerPage from "@/pages/data-viewer";
 import ApiKeysPage from "@/pages/api-keys";
+import ApiDocsPage from "@/pages/api-docs";
 import RolesPage from "@/pages/roles";
 import RoleFormPage from "@/pages/role-form";
 import UsersPage from "@/pages/users";
@@ -25,6 +26,7 @@ function AuthenticatedRouter() {
     <Switch>
       <Route path="/" component={DataViewerPage} />
       <Route path="/api-keys" component={ApiKeysPage} />
+      <Route path="/api-docs" component={ApiDocsPage} />
       {isAdmin && (
         <>
           <Route path="/roles" component={RolesPage} />
