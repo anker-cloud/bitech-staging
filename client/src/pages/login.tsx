@@ -52,15 +52,13 @@ export default function LoginPage() {
 
       <main className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm space-y-8">
-          <div className="flex flex-col items-center space-y-2">
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold tracking-tight">DC4AI</h1>
-              <span className="text-muted-foreground text-lg">by</span>
-              <img src={bitechLogo} alt="Bitech" className="h-8 w-auto" data-testid="img-bitech-logo" />
-            </div>
+          <div className="flex flex-col items-center space-y-3 text-center">
+            <h1 className="text-3xl font-bold tracking-tight">DC4AI</h1>
             <p className="text-muted-foreground text-sm">
-              Data Collection 4 Artificial Intelligence
+              Data Collection for Artificial Intelligence
             </p>
+            <span className="text-muted-foreground text-sm">by</span>
+            <img src={bitechLogo} alt="Bitech" className="h-16 w-auto" data-testid="img-bitech-logo" />
           </div>
 
           <div className="space-y-6">
