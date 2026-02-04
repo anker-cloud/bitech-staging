@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import LoginPage from "@/pages/login";
 import DataViewerPage from "@/pages/data-viewer";
+import ApiKeysPage from "@/pages/api-keys";
 import RolesPage from "@/pages/roles";
 import RoleFormPage from "@/pages/role-form";
 import UsersPage from "@/pages/users";
@@ -23,6 +24,7 @@ function AuthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={DataViewerPage} />
+      <Route path="/api-keys" component={ApiKeysPage} />
       {isAdmin && (
         <>
           <Route path="/roles" component={RolesPage} />

@@ -1,4 +1,4 @@
-import { Database, Users, Shield, LogOut } from "lucide-react";
+import { Database, Users, Shield, LogOut, Key } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import {
   Sidebar,
@@ -23,6 +23,11 @@ const mainNavItems = [
     title: "Data Viewer",
     url: "/",
     icon: Database,
+  },
+  {
+    title: "API Keys",
+    url: "/api-keys",
+    icon: Key,
   },
 ];
 
@@ -71,7 +76,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location === item.url}
+                    isActive={location === item.url || (item.url !== "/" && location.startsWith(item.url))}
                     data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <Link href={item.url}>
