@@ -22,14 +22,16 @@ export default function ApiDocsPage() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const curlExample = `curl -X GET "https://your-domain.replit.app/api/v1/fetch?columns=city_name,title&limit=10" \\
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dc4ai.replit.app';
+
+  const curlExample = `curl -X GET "${baseUrl}/api/v1/fetch?columns=city_name,title&limit=10" \\
   -H "x-api-key: dc4ai_your-api-key-here" \\
   -H "x-data-source: crime-data-db" \\
   -H "Accept: application/json"`;
 
   const pythonExample = `import requests
 
-url = "https://your-domain.replit.app/api/v1/fetch"
+url = "${baseUrl}/api/v1/fetch"
 headers = {
     "x-api-key": "dc4ai_your-api-key-here",
     "x-data-source": "crime-data-db",
@@ -45,7 +47,7 @@ data = response.json()
 print(data)`;
 
   const javascriptExample = `const response = await fetch(
-  "https://your-domain.replit.app/api/v1/fetch?columns=city_name,title&limit=10",
+  "${baseUrl}/api/v1/fetch?columns=city_name,title&limit=10",
   {
     method: "GET",
     headers: {
@@ -125,9 +127,9 @@ console.log(data);`;
               </p>
             </section>
 
-            <section id="base-url">
+            <section id="base-url" data-testid="section-base-url">
               <h2 className="text-xl font-semibold mb-4">Base URL</h2>
-              <Table>
+              <Table data-testid="table-base-url">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-32">Environment</TableHead>
@@ -155,9 +157,9 @@ console.log(data);`;
               </Table>
             </section>
 
-            <section id="headers">
+            <section id="headers" data-testid="section-headers">
               <h2 className="text-xl font-semibold mb-4">Headers</h2>
-              <Table>
+              <Table data-testid="table-headers">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-40">Key</TableHead>
@@ -205,9 +207,9 @@ console.log(data);`;
               </Table>
             </section>
 
-            <section id="query-params">
+            <section id="query-params" data-testid="section-query-params">
               <h2 className="text-xl font-semibold mb-4">Query Parameters</h2>
-              <Table>
+              <Table data-testid="table-query-params">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-40">Key</TableHead>
@@ -243,14 +245,14 @@ console.log(data);`;
               </Table>
             </section>
 
-            <section id="response">
+            <section id="response" data-testid="section-response">
               <h2 className="text-xl font-semibold mb-4">Response</h2>
               <p className="text-muted-foreground mb-4">
                 Successful responses return JSON with a <code className="bg-muted px-1 rounded">data</code> array and <code className="bg-muted px-1 rounded">meta</code> object.
               </p>
               
               <h3 className="text-lg font-medium mb-3">Data Dictionary</h3>
-              <Table>
+              <Table data-testid="table-data-dictionary">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-48">Field</TableHead>
@@ -293,9 +295,9 @@ console.log(data);`;
               </Table>
             </section>
 
-            <section id="response-codes">
+            <section id="response-codes" data-testid="section-response-codes">
               <h2 className="text-xl font-semibold mb-4">Response Codes</h2>
-              <Table>
+              <Table data-testid="table-response-codes">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-32">Code</TableHead>
@@ -345,20 +347,20 @@ console.log(data);`;
           </div>
         </div>
 
-        <div className="w-[400px] border-l bg-slate-900 dark:bg-slate-950 p-4 sticky top-0 h-screen overflow-auto">
+        <div className="w-[400px] border-l bg-slate-900 dark:bg-slate-950 p-4 sticky top-0 h-screen overflow-auto z-50">
           <div className="space-y-6">
             <div>
-              <Tabs defaultValue="curl" className="w-full">
+              <Tabs defaultValue="curl" className="w-full" data-testid="tabs-code-examples">
                 <div className="flex items-center justify-between mb-2">
                   <TabsList className="bg-slate-800">
-                    <TabsTrigger value="curl" className="text-xs">cURL</TabsTrigger>
-                    <TabsTrigger value="python" className="text-xs">Python</TabsTrigger>
-                    <TabsTrigger value="javascript" className="text-xs">JavaScript</TabsTrigger>
+                    <TabsTrigger value="curl" className="text-xs" data-testid="tab-curl">cURL</TabsTrigger>
+                    <TabsTrigger value="python" className="text-xs" data-testid="tab-python">Python</TabsTrigger>
+                    <TabsTrigger value="javascript" className="text-xs" data-testid="tab-javascript">JavaScript</TabsTrigger>
                   </TabsList>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                    className="h-8 w-8 text-slate-400"
                     onClick={() => {
                       const code = document.querySelector('[data-code-active="true"]')?.textContent || curlExample;
                       copyToClipboard(code, 'code');
@@ -392,13 +394,13 @@ console.log(data);`;
 
             <div>
               <div className="text-sm text-slate-400 mb-2">Response</div>
-              <Tabs defaultValue="200" className="w-full">
+              <Tabs defaultValue="200" className="w-full" data-testid="tabs-response">
                 <TabsList className="bg-slate-800 mb-2">
-                  <TabsTrigger value="200" className="text-xs data-[state=active]:bg-green-600">200</TabsTrigger>
-                  <TabsTrigger value="400" className="text-xs">400</TabsTrigger>
-                  <TabsTrigger value="401" className="text-xs">401</TabsTrigger>
-                  <TabsTrigger value="403" className="text-xs">403</TabsTrigger>
-                  <TabsTrigger value="500" className="text-xs">500</TabsTrigger>
+                  <TabsTrigger value="200" className="text-xs data-[state=active]:bg-green-600" data-testid="tab-response-200">200</TabsTrigger>
+                  <TabsTrigger value="400" className="text-xs" data-testid="tab-response-400">400</TabsTrigger>
+                  <TabsTrigger value="401" className="text-xs" data-testid="tab-response-401">401</TabsTrigger>
+                  <TabsTrigger value="403" className="text-xs" data-testid="tab-response-403">403</TabsTrigger>
+                  <TabsTrigger value="500" className="text-xs" data-testid="tab-response-500">500</TabsTrigger>
                 </TabsList>
                 <TabsContent value="200" className="mt-0">
                   <pre className="text-xs text-slate-300 bg-slate-800 p-4 rounded-lg overflow-x-auto">

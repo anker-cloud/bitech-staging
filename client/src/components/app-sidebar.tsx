@@ -113,24 +113,26 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+        <SidebarGroup>
+          <SidebarGroupLabel>Resources</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location === "/api-docs"}
+                  data-testid="nav-api-documentation"
+                >
+                  <Link href="/api-docs">
+                    <BookOpen className="h-4 w-4" />
+                    <span>API Documentation</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-
-      <div className="mt-auto border-t">
-        <SidebarMenu className="p-2">
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={location === "/api-docs"}
-              data-testid="nav-api-documentation"
-            >
-              <Link href="/api-docs">
-                <BookOpen className="h-4 w-4" />
-                <span>API Documentation</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </div>
 
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3 rounded-md bg-sidebar-accent p-3">
