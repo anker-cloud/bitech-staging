@@ -528,7 +528,8 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       console.error("Revoke API key error:", error);
-      res.status(500).json({ message: "Failed to revoke API key" });
+      const message = error instanceof Error ? error.message : "Failed to revoke API key";
+      res.status(400).json({ message });
     }
   });
 
