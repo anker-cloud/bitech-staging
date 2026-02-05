@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript with ES modules
 - **API Design**: RESTful JSON API with Bearer token authentication
-- **Authentication Middleware**: JWT verification supporting both AWS Cognito tokens and demo mode tokens
+- **Authentication Middleware**: JWT verification using AWS Cognito tokens
 
 ### Data Storage
 - **Primary Database**: PostgreSQL via Drizzle ORM
@@ -35,10 +35,18 @@ Preferred communication style: Simple, everyday language.
 
 ### Authentication Flow
 1. User submits credentials to `/api/auth/login`
-2. Backend authenticates via AWS Cognito (or demo mode)
+2. Backend authenticates via AWS Cognito using ADMIN_USER_PASSWORD_AUTH
 3. JWT tokens returned and stored in localStorage
 4. Subsequent API requests include Bearer token in Authorization header
-5. Auth middleware validates tokens and attaches user context
+5. Auth middleware validates Cognito JWT tokens and attaches user context
+
+### Initial Setup Flow
+When no users exist in the system:
+1. App detects empty users table via `/api/setup/status`
+2. Displays Setup page instead of Login page
+3. Admin creates first user via `/api/setup/admin` endpoint
+4. User is created in both Cognito and app database
+5. Automatic login after setup complete
 
 ### Permission Model
 - Roles define access to data sources with table, column, and row-level granularity
@@ -63,19 +71,18 @@ Preferred communication style: Simple, everyday language.
 
 ### Environment Variables Required
 - `DATABASE_URL` - PostgreSQL connection string
-- `AWS_REGION` - AWS region for services
+- `AWS_REGION` - AWS region for services (default: eu-central-1)
 - `AWS_ACCESS_KEY_ID` - AWS credentials
 - `AWS_SECRET_ACCESS_KEY` - AWS credentials
 - `COGNITO_USER_POOL_ID` - Cognito user pool identifier
-- `COGNITO_CLIENT_ID` - Cognito app client identifier
+- `COGNITO_CLIENT_ID` - Cognito app client identifier (must have ADMIN_USER_PASSWORD_AUTH enabled)
 - `AWS_ACCOUNT_ID` - AWS account for IAM role ARNs
 - `ATHENA_OUTPUT_LOCATION` - S3 bucket for query results
-- `DEMO_MODE` - Set to "true" to bypass AWS integrations
 
-### Hybrid Mode (Current Configuration)
-The platform operates in hybrid mode:
-- **Authentication**: Demo mode (`DEMO_MODE=true`) - Uses demo tokens due to AWS Cognito ADMIN_USER_PASSWORD_AUTH not being enabled on the user pool client
-- **Data Operations**: Real AWS services - Glue for schema discovery, Athena for query execution, S3 for result storage
+### AWS Cognito Requirements
+The Cognito User Pool client must have:
+- `ADMIN_USER_PASSWORD_AUTH` auth flow enabled
+- App client configured for server-side authentication
 
 ### AWS Glue Catalog Structure
 The platform connects to the following real AWS Glue databases and tables:

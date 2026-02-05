@@ -84,7 +84,6 @@ function AppContent() {
   const handleSetupComplete = () => {
     setSetupComplete(true);
     refetchSetupStatus();
-    window.location.reload();
   };
 
   if (authLoading || setupLoading) {

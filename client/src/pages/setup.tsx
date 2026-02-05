@@ -32,7 +32,7 @@ export default function SetupPage({ onSetupComplete }: SetupPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { setAuthUser } = useAuth();
   const { toast } = useToast();
 
   const form = useForm<SetupFormData>({
@@ -69,7 +69,7 @@ export default function SetupPage({ onSetupComplete }: SetupPageProps) {
         description: "Admin account created successfully. You are now logged in.",
       });
 
-      localStorage.setItem("accessToken", data.user.accessToken);
+      setAuthUser(data.user);
       onSetupComplete();
     } catch (error) {
       toast({

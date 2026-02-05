@@ -86,9 +86,10 @@ export async function registerRoutes(
   });
 
   // Public endpoint to create initial admin user (only works when no users exist)
+  // Uses double-check pattern for race condition protection
   app.post("/api/setup/admin", async (req: Request, res: Response) => {
     try {
-      // Check if any users exist
+      // First check - early exit for obvious cases
       const existingUsers = await storage.getAllUsers();
       if (existingUsers.length > 0) {
         return res.status(403).json({ 
@@ -132,8 +133,23 @@ export async function registerRoutes(
         });
       }
 
-      // Create user in Cognito first
+      // Create user in Cognito first (before DB to avoid orphaned DB records)
       const cognitoUserId = await createCognitoUser(email, password, name);
+
+      // Second check - right before insert to prevent race conditions
+      const usersBeforeInsert = await storage.getAllUsers();
+      if (usersBeforeInsert.length > 0) {
+        // Another request created a user while we were processing
+        // Try to clean up the Cognito user we just created
+        try {
+          await deleteCognitoUser(email);
+        } catch (cleanupError) {
+          console.error("Failed to cleanup Cognito user after race condition:", cleanupError);
+        }
+        return res.status(403).json({ 
+          message: "Setup already completed by another request." 
+        });
+      }
 
       // Create user in database
       const user = await storage.createUser({

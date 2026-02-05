@@ -9,6 +9,7 @@ interface AuthContextType {
   canGenerateApiKeys: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  setAuthUser: (user: AuthenticatedUser) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("auth_user");
   }, []);
 
+  const setAuthUser = useCallback((newUser: AuthenticatedUser) => {
+    setUser(newUser);
+    localStorage.setItem("auth_user", JSON.stringify(newUser));
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -62,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canGenerateApiKeys: user?.role?.canGenerateApiKeys ?? false,
         login,
         logout,
+        setAuthUser,
       }}
     >
       {children}
