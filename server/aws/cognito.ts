@@ -27,22 +27,9 @@ export interface CognitoUser {
   sub: string;
 }
 
-const isDemoMode = process.env.DEMO_MODE === "true" || !userPoolId || !clientId;
-
 export async function authenticateUser(email: string, password: string): Promise<{ accessToken: string; idToken: string; refreshToken: string }> {
-  if (isDemoMode) {
-    const demoToken = Buffer.from(JSON.stringify({
-      email,
-      sub: `demo-${email}`,
-      exp: Math.floor(Date.now() / 1000) + 3600 * 24,
-      iss: "demo-issuer",
-    })).toString("base64");
-    
-    return {
-      accessToken: `demo.${demoToken}.signature`,
-      idToken: `demo.${demoToken}.signature`,
-      refreshToken: `demo.${demoToken}.signature`,
-    };
+  if (!userPoolId || !clientId) {
+    throw new Error("Cognito is not configured. Please set COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID environment variables.");
   }
 
   const command = new AdminInitiateAuthCommand({
@@ -68,14 +55,9 @@ export async function authenticateUser(email: string, password: string): Promise
   };
 }
 
-export function isInDemoMode(): boolean {
-  return isDemoMode;
-}
-
 export async function createCognitoUser(email: string, password: string, name: string): Promise<string> {
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would create Cognito user: ${email}`);
-    return `demo-sub-${email.replace(/[^a-zA-Z0-9]/g, "-")}`;
+  if (!userPoolId) {
+    throw new Error("Cognito is not configured. Please set COGNITO_USER_POOL_ID environment variable.");
   }
 
   const createCommand = new AdminCreateUserCommand({
@@ -109,9 +91,8 @@ export async function createCognitoUser(email: string, password: string, name: s
 }
 
 export async function updateCognitoUser(email: string, updates: { name?: string; newEmail?: string }): Promise<void> {
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would update Cognito user: ${email}`, updates);
-    return;
+  if (!userPoolId) {
+    throw new Error("Cognito is not configured. Please set COGNITO_USER_POOL_ID environment variable.");
   }
 
   const attributes: { Name: string; Value: string }[] = [];
@@ -137,9 +118,8 @@ export async function updateCognitoUser(email: string, updates: { name?: string;
 }
 
 export async function deleteCognitoUser(email: string): Promise<void> {
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would delete Cognito user: ${email}`);
-    return;
+  if (!userPoolId) {
+    throw new Error("Cognito is not configured. Please set COGNITO_USER_POOL_ID environment variable.");
   }
 
   const command = new AdminDeleteUserCommand({
@@ -177,9 +157,8 @@ export async function getCognitoUser(email: string): Promise<CognitoUser | null>
 }
 
 export async function setUserPassword(email: string, password: string): Promise<void> {
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would set password for user: ${email}`);
-    return;
+  if (!userPoolId) {
+    throw new Error("Cognito is not configured. Please set COGNITO_USER_POOL_ID environment variable.");
   }
 
   const command = new AdminSetUserPasswordCommand({
