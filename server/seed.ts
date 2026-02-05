@@ -1,6 +1,5 @@
 import { db } from "./db";
-import { roles, users, DATA_SOURCES, type DataSourcePermission } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { roles, DATA_SOURCES, type DataSourcePermission } from "@shared/schema";
 
 export async function seedDatabase() {
   console.log("Checking if seed data exists...");
@@ -12,9 +11,9 @@ export async function seedDatabase() {
     return;
   }
 
-  console.log("Seeding database with initial data...");
+  console.log("Seeding database with default roles...");
 
-  const riskAnalystPermissions: DataSourcePermission[] = DATA_SOURCES.map(ds => ({
+  const fullAccessPermissions: DataSourcePermission[] = DATA_SOURCES.map(ds => ({
     dataSourceId: ds.id,
     hasAccess: true,
     tables: [{
@@ -24,136 +23,13 @@ export async function seedDatabase() {
     }],
   }));
 
-  const [adminRole] = await db.insert(roles).values({
+  await db.insert(roles).values({
     name: "App Admin",
     description: "Full administrative access to manage roles, users, and all data",
     isAdmin: true,
-    permissions: riskAnalystPermissions,
-  }).returning();
-
-  const [riskAnalystRole] = await db.insert(roles).values({
-    name: "Risk Analyst",
-    description: "Full access to all data sources for risk analysis",
-    isAdmin: false,
-    permissions: riskAnalystPermissions,
-  }).returning();
-
-  const marketingPermissions: DataSourcePermission[] = [
-    {
-      dataSourceId: "crime-data-db",
-      hasAccess: false,
-      tables: [],
-    },
-    {
-      dataSourceId: "events-data-db",
-      hasAccess: true,
-      tables: [{
-        tableName: "event_data_prd_silver",
-        columns: [],
-        allColumns: true,
-      }],
-    },
-    {
-      dataSourceId: "traffic-data-db",
-      hasAccess: true,
-      tables: [{
-        tableName: "traffic_data_prd_silver",
-        columns: [],
-        allColumns: true,
-      }],
-    },
-    {
-      dataSourceId: "weather-data-db",
-      hasAccess: false,
-      tables: [],
-    },
-  ];
-
-  const [marketingRole] = await db.insert(roles).values({
-    name: "Marketing",
-    description: "Limited access for marketing analytics",
-    isAdmin: false,
-    permissions: marketingPermissions,
-  }).returning();
-
-  const dataAnalystPermissions: DataSourcePermission[] = [
-    {
-      dataSourceId: "crime-data-db",
-      hasAccess: true,
-      tables: [{
-        tableName: "crime_data_prd_silver",
-        columns: [],
-        allColumns: true,
-      }],
-    },
-    {
-      dataSourceId: "events-data-db",
-      hasAccess: true,
-      tables: [{
-        tableName: "event_data_prd_silver",
-        columns: [],
-        allColumns: true,
-      }],
-    },
-    {
-      dataSourceId: "traffic-data-db",
-      hasAccess: true,
-      tables: [{
-        tableName: "traffic_data_prd_silver",
-        columns: [],
-        allColumns: true,
-      }],
-    },
-    {
-      dataSourceId: "weather-data-db",
-      hasAccess: true,
-      tables: [{
-        tableName: "weather_data_prd_silver",
-        columns: [],
-        allColumns: true,
-      }],
-    },
-  ];
-
-  const [dataAnalystRole] = await db.insert(roles).values({
-    name: "Data Analyst",
-    description: "Access to public datasets for analysis, excluding insurance data",
-    isAdmin: false,
-    permissions: dataAnalystPermissions,
-  }).returning();
-
-  await db.insert(users).values([
-    {
-      name: "Admin User",
-      email: "admin@example.com",
-      roleId: adminRole.id,
-      cognitoUserId: "demo-admin-cognito-id",
-      isActive: true,
-    },
-    {
-      name: "Sarah Johnson",
-      email: "sarah.johnson@example.com",
-      roleId: riskAnalystRole.id,
-      cognitoUserId: "demo-sarah-cognito-id",
-      isActive: true,
-    },
-    {
-      name: "Michael Chen",
-      email: "michael.chen@example.com",
-      roleId: marketingRole.id,
-      cognitoUserId: "demo-michael-cognito-id",
-      isActive: true,
-    },
-    {
-      name: "Emily Davis",
-      email: "emily.davis@example.com",
-      roleId: dataAnalystRole.id,
-      cognitoUserId: "demo-emily-cognito-id",
-      isActive: true,
-    },
-  ]);
+    permissions: fullAccessPermissions,
+  });
 
   console.log("Database seeded successfully!");
-  console.log("Created roles: App Admin, Risk Analyst, Marketing, Data Analyst");
-  console.log("Created 4 demo users");
+  console.log("Created default admin role - use /setup to create initial admin user");
 }

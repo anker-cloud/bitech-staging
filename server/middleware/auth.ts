@@ -22,30 +22,6 @@ function getVerifier() {
   return verifier;
 }
 
-const isDemoModeEnabled = process.env.DEMO_MODE === "true";
-
-function isDemoToken(token: string): boolean {
-  return token.startsWith("demo.");
-}
-
-function parseDemoToken(token: string): { email: string; sub: string; exp: number } | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3 || parts[0] !== "demo") {
-      return null;
-    }
-    const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
-    
-    if (!payload.email || !payload.sub || !payload.exp || payload.iss !== "demo-issuer") {
-      return null;
-    }
-    
-    return { email: payload.email, sub: payload.sub, exp: payload.exp };
-  } catch {
-    return null;
-  }
-}
-
 export async function authMiddleware(
   req: AuthenticatedRequest,
   res: Response,
@@ -62,30 +38,12 @@ export async function authMiddleware(
 
     let email: string;
 
-    if (isDemoToken(token)) {
-      if (!isDemoModeEnabled) {
-        return res.status(401).json({ message: "Demo mode is not enabled" });
-      }
-      
-      const demoPayload = parseDemoToken(token);
-      if (!demoPayload) {
-        return res.status(401).json({ message: "Invalid demo token" });
-      }
-      
-      const currentTime = Math.floor(Date.now() / 1000);
-      if (demoPayload.exp < currentTime) {
-        return res.status(401).json({ message: "Demo token has expired" });
-      }
-      
-      email = demoPayload.email;
-    } else {
-      try {
-        const payload = await getVerifier().verify(token);
-        email = payload.username as string;
-      } catch (verifyError) {
-        console.error("Token verification failed:", verifyError);
-        return res.status(401).json({ message: "Invalid or expired token" });
-      }
+    try {
+      const payload = await getVerifier().verify(token);
+      email = payload.username as string;
+    } catch (verifyError) {
+      console.error("Token verification failed:", verifyError);
+      return res.status(401).json({ message: "Invalid or expired token" });
     }
 
     const user = await storage.getUserByEmail(email);

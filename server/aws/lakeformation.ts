@@ -17,17 +17,10 @@ const client = new LakeFormationClient({
   },
 });
 
-const isDemoMode = process.env.DEMO_MODE === "true" || !process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY;
-
 export async function grantLakeFormationPermissions(
   iamRoleArn: string,
   permissions: DataSourcePermission[]
 ): Promise<void> {
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would grant Lake Formation permissions for: ${iamRoleArn}`);
-    return;
-  }
-
   const entries = [];
 
   for (const permission of permissions) {
@@ -81,11 +74,6 @@ export async function revokeLakeFormationPermissions(
   iamRoleArn: string,
   permissions: DataSourcePermission[]
 ): Promise<void> {
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would revoke Lake Formation permissions for: ${iamRoleArn}`);
-    return;
-  }
-
   const entries = [];
 
   for (const permission of permissions) {

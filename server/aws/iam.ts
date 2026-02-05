@@ -17,7 +17,6 @@ const client = new IAMClient({
 });
 
 const accountId = process.env.AWS_ACCOUNT_ID || "123456789012";
-const isDemoMode = process.env.DEMO_MODE === "true" || !process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY;
 
 function getRoleNameFromAppRole(roleName: string): string {
   return `DataAccessPlatform-${roleName.replace(/\s+/g, "-")}`;
@@ -25,11 +24,6 @@ function getRoleNameFromAppRole(roleName: string): string {
 
 export async function createIAMRole(roleName: string, permissions: DataSourcePermission[]): Promise<string> {
   const iamRoleName = getRoleNameFromAppRole(roleName);
-  
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would create IAM role: ${iamRoleName}`);
-    return `arn:aws:iam::${accountId}:role/${iamRoleName}`;
-  }
   
   const assumeRolePolicy = {
     Version: "2012-10-17",
@@ -145,11 +139,6 @@ export async function createIAMRole(roleName: string, permissions: DataSourcePer
 export async function updateIAMRole(roleName: string, permissions: DataSourcePermission[]): Promise<void> {
   const iamRoleName = getRoleNameFromAppRole(roleName);
 
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would update IAM role: ${iamRoleName}`);
-    return;
-  }
-
   const accessibleDatabases = permissions
     .filter(p => p.hasAccess)
     .map(p => p.dataSourceId);
@@ -231,11 +220,6 @@ export async function updateIAMRole(roleName: string, permissions: DataSourcePer
 
 export async function deleteIAMRole(roleName: string): Promise<void> {
   const iamRoleName = getRoleNameFromAppRole(roleName);
-
-  if (isDemoMode) {
-    console.log(`[Demo Mode] Would delete IAM role: ${iamRoleName}`);
-    return;
-  }
 
   try {
     const deletePolicyCommand = new DeleteRolePolicyCommand({
