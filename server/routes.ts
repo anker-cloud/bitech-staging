@@ -67,6 +67,105 @@ export async function registerRoutes(
     }
   });
 
+  // Public endpoint to check if setup is needed
+  app.get("/api/setup/status", async (req: Request, res: Response) => {
+    try {
+      const users = await storage.getAllUsers();
+      const roles = await storage.getAllRoles();
+      const adminRole = roles.find(r => r.isAdmin);
+      
+      res.json({
+        needsSetup: users.length === 0,
+        hasAdminRole: !!adminRole,
+        adminRoleId: adminRole?.id || null,
+      });
+    } catch (error) {
+      console.error("Setup status error:", error);
+      res.status(500).json({ message: "Failed to check setup status" });
+    }
+  });
+
+  // Public endpoint to create initial admin user (only works when no users exist)
+  app.post("/api/setup/admin", async (req: Request, res: Response) => {
+    try {
+      // Check if any users exist
+      const existingUsers = await storage.getAllUsers();
+      if (existingUsers.length > 0) {
+        return res.status(403).json({ 
+          message: "Setup already completed. Admin user can only be created when no users exist." 
+        });
+      }
+
+      const { name, email, password } = req.body;
+      
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "Name, email, and password are required" });
+      }
+
+      // Validate password strength
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      // Get or create admin role
+      const roles = await storage.getAllRoles();
+      let adminRole = roles.find(r => r.isAdmin);
+      
+      if (!adminRole) {
+        // Create admin role with full permissions
+        const fullAccessPermissions: DataSourcePermission[] = DATA_SOURCES.map(ds => ({
+          dataSourceId: ds.id,
+          hasAccess: true,
+          tables: [{
+            tableName: ds.tableName,
+            columns: [],
+            allColumns: true,
+            allRows: true,
+          }],
+        }));
+
+        adminRole = await storage.createRole({
+          name: "App Admin",
+          description: "Full administrative access to manage roles, users, and all data",
+          isAdmin: true,
+          permissions: fullAccessPermissions,
+        });
+      }
+
+      // Create user in Cognito first
+      const cognitoUserId = await createCognitoUser(email, password, name);
+
+      // Create user in database
+      const user = await storage.createUser({
+        name,
+        email,
+        roleId: adminRole.id,
+        cognitoUserId,
+        isActive: true,
+      });
+
+      // Authenticate and return tokens
+      const tokens = await authenticateUser(email, password);
+
+      res.status(201).json({
+        message: "Admin user created successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: adminRole,
+          isAdmin: true,
+          accessToken: tokens.accessToken,
+        },
+      });
+    } catch (error) {
+      console.error("Setup admin error:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to create admin user" 
+      });
+    }
+  });
+
   app.get("/api/roles", authMiddleware, adminMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const roles = await storage.getAllRoles();

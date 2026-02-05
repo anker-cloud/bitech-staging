@@ -20,6 +20,7 @@ export async function seedDatabase() {
       tableName: ds.tableName,
       columns: [],
       allColumns: true,
+      allRows: true,
     }],
   }));
 

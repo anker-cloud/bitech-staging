@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -10,6 +11,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import LoginPage from "@/pages/login";
+import SetupPage from "@/pages/setup";
 import DataViewerPage from "@/pages/data-viewer";
 import ApiKeysPage from "@/pages/api-keys";
 import ApiDocsPage from "@/pages/api-docs";
@@ -67,9 +69,25 @@ function AuthenticatedLayout() {
 }
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [setupComplete, setSetupComplete] = useState(false);
 
-  if (isLoading) {
+  const { data: setupStatus, isLoading: setupLoading, refetch: refetchSetupStatus } = useQuery<{
+    needsSetup: boolean;
+    hasAdminRole: boolean;
+    adminRoleId: string | null;
+  }>({
+    queryKey: ["/api/setup/status"],
+    staleTime: 0,
+  });
+
+  const handleSetupComplete = () => {
+    setSetupComplete(true);
+    refetchSetupStatus();
+    window.location.reload();
+  };
+
+  if (authLoading || setupLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -78,6 +96,10 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  if (setupStatus?.needsSetup && !setupComplete) {
+    return <SetupPage onSetupComplete={handleSetupComplete} />;
   }
 
   if (!isAuthenticated) {
