@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { DATA_SOURCES, filterOperators, type DataSourceId, type QueryFilter, type QueryConfig } from "@shared/schema";
+import { normalizeGermanExpr, normalizeGermanValue } from "@shared/sql-normalize";
 import { apiRequest } from "@/lib/queryClient";
 
 interface TableColumn {
@@ -79,30 +80,34 @@ export default function DataViewerPage() {
       const whereClause = filters
         .map((f, i) => {
           let condition = "";
+          const isStringOp = ["equals", "not_equals", "contains", "not_contains", "in"].includes(f.operator);
+          const quotedCol = `"${f.column}"`;
+          const col = isStringOp ? normalizeGermanExpr(quotedCol) : quotedCol;
+          const val = isStringOp ? normalizeGermanValue(f.value) : f.value;
           switch (f.operator) {
             case "equals":
-              condition = `${f.column} = '${f.value}'`;
+              condition = `${col} = '${val}'`;
               break;
             case "not_equals":
-              condition = `${f.column} != '${f.value}'`;
+              condition = `${col} != '${val}'`;
               break;
             case "contains":
-              condition = `${f.column} LIKE '%${f.value}%'`;
+              condition = `${col} LIKE '%${val}%'`;
               break;
             case "not_contains":
-              condition = `${f.column} NOT LIKE '%${f.value}%'`;
+              condition = `${col} NOT LIKE '%${val}%'`;
               break;
             case "greater_than":
-              condition = `${f.column} > '${f.value}'`;
+              condition = `${quotedCol} > '${f.value}'`;
               break;
             case "less_than":
-              condition = `${f.column} < '${f.value}'`;
+              condition = `${quotedCol} < '${f.value}'`;
               break;
             case "greater_or_equal":
-              condition = `${f.column} >= '${f.value}'`;
+              condition = `${quotedCol} >= '${f.value}'`;
               break;
             case "less_or_equal":
-              condition = `${f.column} <= '${f.value}'`;
+              condition = `${quotedCol} <= '${f.value}'`;
               break;
           }
           return i === 0 ? condition : `${f.logic || "AND"} ${condition}`;

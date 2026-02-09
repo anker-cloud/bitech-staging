@@ -10,6 +10,7 @@ import { authMiddleware, adminMiddleware, validateDataSourceAccess, getRowFilter
 import { insertRoleSchema, insertUserSchema, DATA_SOURCES, type DataSourcePermission, type Role } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
+import { normalizeGermanExpr, normalizeGermanValue } from "@shared/sql-normalize";
 
 function generateApiKey(): { key: string; hash: string; prefix: string } {
   const key = `dc4ai_${crypto.randomBytes(32).toString('hex')}`;
@@ -761,7 +762,7 @@ export async function registerRoutes(
         }
       }
 
-      // Build filters from query params (equals only)
+      // Build filters from query params (equals only, with German char normalization + case insensitivity)
       const filterParams = Object.entries(req.query)
         .filter(([key]) => !["columns", "limit", "offset"].includes(key));
       
@@ -769,7 +770,9 @@ export async function registerRoutes(
       for (const [column, value] of filterParams) {
         const safeColumn = column.replace(/"/g, '""');
         const safeValue = String(value).replace(/'/g, "''");
-        filterClauses.push(`"${safeColumn}" = '${safeValue}'`);
+        const normalizedCol = normalizeGermanExpr(`"${safeColumn}"`);
+        const normalizedVal = normalizeGermanValue(safeValue);
+        filterClauses.push(`${normalizedCol} = '${normalizedVal}'`);
       }
 
       // Apply row-level permissions
@@ -777,17 +780,20 @@ export async function registerRoutes(
         for (const filter of tablePermission.rowFilters) {
           const safeCol = filter.column.replace(/"/g, '""');
           const safeVal = String(filter.value).replace(/'/g, "''");
+          const isStringOp = ['equals', 'not_equals', 'contains', 'in'].includes(filter.operator);
+          const colExpr = isStringOp ? normalizeGermanExpr(`"${safeCol}"`) : `"${safeCol}"`;
+          const valExpr = isStringOp ? normalizeGermanValue(safeVal) : safeVal;
           
           let clause: string;
           switch (filter.operator) {
             case "equals":
-              clause = `"${safeCol}" = '${safeVal}'`;
+              clause = `${colExpr} = '${valExpr}'`;
               break;
             case "not_equals":
-              clause = `"${safeCol}" != '${safeVal}'`;
+              clause = `${colExpr} != '${valExpr}'`;
               break;
             case "contains":
-              clause = `"${safeCol}" LIKE '%${safeVal}%'`;
+              clause = `${colExpr} LIKE '%${valExpr}%'`;
               break;
             case "greater_than":
               clause = `"${safeCol}" > '${safeVal}'`;
@@ -796,11 +802,11 @@ export async function registerRoutes(
               clause = `"${safeCol}" < '${safeVal}'`;
               break;
             case "in":
-              const values = safeVal.split(",").map(v => `'${v.trim()}'`).join(", ");
-              clause = `"${safeCol}" IN (${values})`;
+              const values = safeVal.split(",").map(v => `'${normalizeGermanValue(v.trim())}'`).join(", ");
+              clause = `${colExpr} IN (${values})`;
               break;
             default:
-              clause = `"${safeCol}" = '${safeVal}'`;
+              clause = `${colExpr} = '${valExpr}'`;
           }
           filterClauses.push(clause);
         }

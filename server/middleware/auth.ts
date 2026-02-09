@@ -3,6 +3,7 @@ import type { ParamsDictionary } from "express-serve-static-core";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { storage } from "../storage";
 import type { User, Role, RowFilterCondition } from "@shared/schema";
+import { normalizeGermanExpr, normalizeGermanValue, isStringFilterOperator } from "@shared/sql-normalize";
 
 export interface AuthenticatedRequest<P = ParamsDictionary> extends Request<P> {
   user?: User & { role?: Role };
@@ -193,17 +194,20 @@ export function buildRowFilterWhereClause(filters: RowFilterCondition[], allowed
     
     const quotedColumn = quoteIdentifier(filter.column);
     const escapedValue = filter.value.replace(/'/g, "''");
+    const useNormalization = isStringFilterOperator(filter.operator);
+    const normalizedCol = useNormalization ? normalizeGermanExpr(quotedColumn) : quotedColumn;
+    const normalizedVal = useNormalization ? normalizeGermanValue(escapedValue) : escapedValue;
     let condition: string;
 
     switch (filter.operator) {
       case "equals":
-        condition = `${quotedColumn} = '${escapedValue}'`;
+        condition = `${normalizedCol} = '${normalizedVal}'`;
         break;
       case "not_equals":
-        condition = `${quotedColumn} != '${escapedValue}'`;
+        condition = `${normalizedCol} != '${normalizedVal}'`;
         break;
       case "contains":
-        condition = `${quotedColumn} LIKE '%${escapedValue}%'`;
+        condition = `${normalizedCol} LIKE '%${normalizedVal}%'`;
         break;
       case "greater_than":
         condition = `${quotedColumn} > '${escapedValue}'`;
@@ -212,8 +216,8 @@ export function buildRowFilterWhereClause(filters: RowFilterCondition[], allowed
         condition = `${quotedColumn} < '${escapedValue}'`;
         break;
       case "in":
-        const values = filter.value.split(",").map(v => `'${v.trim().replace(/'/g, "''")}'`).join(", ");
-        condition = `${quotedColumn} IN (${values})`;
+        const values = filter.value.split(",").map(v => `'${normalizeGermanValue(v.trim().replace(/'/g, "''"))}'`).join(", ");
+        condition = `${normalizedCol} IN (${values})`;
         break;
       default:
         throw new Error(`Unsupported operator: ${filter.operator}`);

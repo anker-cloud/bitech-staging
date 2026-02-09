@@ -56,6 +56,7 @@ When no users exist in the system:
   - **Row Access**: `allRows` toggle or row filters with conditions (column, operator, value, AND/OR logic)
 - Supported row filter operators: equals (=), not_equals (!=), contains (LIKE), greater_than (>), less_than (<), in (IN)
 - Row filters are automatically injected into SQL queries at execution time
+- **German Character Normalization**: All string-based filters (equals, not_equals, contains, in) automatically normalize German umlauts (ä→a, ö→o, ü→u, Ä→A, Ö→O, Ü→U, ß→ss) and are case-insensitive. This applies to the UI query builder, permission-based row filters, and the public REST API. The normalization utility is in `shared/sql-normalize.ts`.
 - Admin roles bypass all data source restrictions
 - IAM roles and Lake Formation permissions sync with application roles
 
