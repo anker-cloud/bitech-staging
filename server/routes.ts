@@ -843,16 +843,16 @@ export async function registerRoutes(
         return res.send([header, ...rows].join("\n"));
       }
 
-      // Default JSON response
+      // Default JSON response - metadata first, then data
       res.json({
-        data: result.rows,
         meta: {
-          columns: result.columns,
           totalRows: result.totalRows,
           limit,
           offset,
           executionTimeMs: result.executionTimeMs,
-        }
+          columns: result.columns,
+        },
+        data: result.rows,
       });
     } catch (error) {
       console.error("API fetch error:", error);
