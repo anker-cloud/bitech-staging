@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 import type { AuthenticatedUser, Role } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     const validateSession = async () => {
@@ -71,15 +73,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await response.json();
     localStorage.setItem("auth_user", JSON.stringify(data.user));
     queryClient.clear();
+    navigate("/");
     setUser(data.user);
-  }, []);
+  }, [navigate]);
 
   const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem("auth_user");
     queryClient.clear();
-    window.history.replaceState(null, "", "/");
-  }, []);
+    navigate("/");
+  }, [navigate]);
 
   const setAuthUser = useCallback((newUser: AuthenticatedUser) => {
     setUser(newUser);
