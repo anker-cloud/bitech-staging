@@ -78,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("auth_user");
     queryClient.clear();
+    window.history.replaceState(null, "", "/");
   }, []);
 
   const setAuthUser = useCallback((newUser: AuthenticatedUser) => {
