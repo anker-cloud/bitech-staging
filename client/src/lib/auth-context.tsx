@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { AuthenticatedUser, Role } from "@shared/schema";
+import { queryClient } from "@/lib/queryClient";
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -68,13 +69,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const data = await response.json();
-    setUser(data.user);
     localStorage.setItem("auth_user", JSON.stringify(data.user));
+    queryClient.clear();
+    setUser(data.user);
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem("auth_user");
+    queryClient.clear();
   }, []);
 
   const setAuthUser = useCallback((newUser: AuthenticatedUser) => {
