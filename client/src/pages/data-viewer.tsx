@@ -184,14 +184,19 @@ export default function DataViewerPage() {
 
     let sql = `SELECT ${cols}\nFROM ${sources[0].tableName} ${sources[0].alias}`;
 
+    const castColumns = new Set<string>();
+    for (const jc of joinColumns) {
+      const types = sources.map((s) => {
+        const cols = allColumnsPerSource[s.dsId] || [];
+        return cols.find((c) => c.name === jc)?.type || "string";
+      });
+      if (types.some((t) => t !== types[0])) castColumns.add(jc);
+    }
+
     for (let i = 1; i < sources.length; i++) {
       const joinConditions = joinColumns
         .map((jc) => {
-          const leftCols = allColumnsPerSource[sources[0].dsId] || [];
-          const rightCols = allColumnsPerSource[sources[i].dsId] || [];
-          const leftType = leftCols.find((c) => c.name === jc)?.type || "string";
-          const rightType = rightCols.find((c) => c.name === jc)?.type || "string";
-          const needsCast = leftType !== rightType;
+          const needsCast = castColumns.has(jc);
           const leftRef = needsCast ? `CAST(${sources[0].alias}."${jc}" AS VARCHAR)` : `${sources[0].alias}."${jc}"`;
           const rightRef = needsCast ? `CAST(${sources[i].alias}."${jc}" AS VARCHAR)` : `${sources[i].alias}."${jc}"`;
           return `${leftRef} = ${rightRef}`;
