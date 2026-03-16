@@ -90,6 +90,31 @@ export default function DataViewerPage() {
     return result;
   }, [selectedDataSources, columnQueryData, user]);
 
+  const joinColumns = useMemo(() => {
+    if (!isMultiTable) return [];
+    const sources = selectedDataSources;
+    const columnSets = sources.map((dsId) => {
+      const cols = allColumnsPerSource[dsId] || [];
+      return new Set(cols.map((c) => c.name));
+    });
+    if (columnSets.length === 0) return [];
+    return [...columnSets[0]].filter((name) =>
+      columnSets.every((set) => set.has(name))
+    );
+  }, [isMultiTable, selectedDataSources, allColumnsPerSource]);
+
+  const columnSourceMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    selectedDataSources.forEach((dsId) => {
+      const cols = allColumnsPerSource[dsId] || [];
+      cols.forEach((c) => {
+        if (!map[c.name]) map[c.name] = [];
+        if (!map[c.name].includes(dsId)) map[c.name].push(dsId);
+      });
+    });
+    return map;
+  }, [selectedDataSources, allColumnsPerSource]);
+
   const accessibleColumns = useMemo(() => {
     const sources = selectedDataSources;
     if (sources.length === 0) return [];
@@ -98,24 +123,19 @@ export default function DataViewerPage() {
       return allColumnsPerSource[sources[0]] || [];
     }
 
-    const columnSets = sources.map((dsId) => {
+    const seen = new Set<string>();
+    const merged: TableColumn[] = [];
+    for (const dsId of sources) {
       const cols = allColumnsPerSource[dsId] || [];
-      return new Set(cols.map((c) => c.name));
-    });
-
-    if (columnSets.length === 0) return [];
-    const commonNames = [...columnSets[0]].filter((name) =>
-      columnSets.every((set) => set.has(name))
-    );
-
-    const firstSourceCols = allColumnsPerSource[sources[0]] || [];
-    return firstSourceCols.filter((col) => commonNames.includes(col.name));
+      for (const col of cols) {
+        if (!seen.has(col.name)) {
+          seen.add(col.name);
+          merged.push(col);
+        }
+      }
+    }
+    return merged;
   }, [selectedDataSources, allColumnsPerSource]);
-
-  const joinColumns = useMemo(() => {
-    if (!isMultiTable) return [];
-    return accessibleColumns.map((c) => c.name);
-  }, [isMultiTable, accessibleColumns]);
 
   useEffect(() => {
     setSelectedColumns([]);
@@ -175,12 +195,39 @@ export default function DataViewerPage() {
       return sql;
     }
 
-    const sources = selectedDataSources.map((dsId, i) => {
+    if (joinColumns.length === 0) return "";
+
+    const allSources = selectedDataSources.map((dsId) => {
       const ds = DATA_SOURCES.find((d) => d.id === dsId);
-      return { dsId, tableName: ds?.tableName || dsId, alias: `t${i + 1}` };
+      return { dsId, tableName: ds?.tableName || dsId };
     });
 
-    const cols = selectedColumns.map((col) => `t1."${col}"`).join(", ");
+    const colCountPerSource: Record<string, number> = {};
+    for (const s of allSources) {
+      const sourceCols = allColumnsPerSource[s.dsId] || [];
+      const sourceColNames = new Set(sourceCols.map((c) => c.name));
+      colCountPerSource[s.dsId] = selectedColumns.filter((c) => sourceColNames.has(c)).length;
+    }
+    const sortedSources = [...allSources].sort((a, b) => {
+      const diff = (colCountPerSource[b.dsId] || 0) - (colCountPerSource[a.dsId] || 0);
+      if (diff !== 0) return diff;
+      return allSources.indexOf(a) - allSources.indexOf(b);
+    });
+    const sources = sortedSources.map((s, i) => ({ ...s, alias: `t${i + 1}` }));
+
+    const sourceAliasMap: Record<string, string> = {};
+    sources.forEach((s) => { sourceAliasMap[s.dsId] = s.alias; });
+
+    const colAlias = (colName: string): string => {
+      if (joinColumns.includes(colName)) return sources[0].alias;
+      const ownerSources = columnSourceMap[colName] || [];
+      for (const s of sources) {
+        if (ownerSources.includes(s.dsId)) return s.alias;
+      }
+      return sources[0].alias;
+    };
+
+    const cols = selectedColumns.map((col) => `${colAlias(col)}."${col}"`).join(", ");
 
     let sql = `SELECT ${cols}\nFROM ${sources[0].tableName} ${sources[0].alias}`;
 
@@ -202,7 +249,7 @@ export default function DataViewerPage() {
           return `${leftRef} = ${rightRef}`;
         })
         .join(" AND ");
-      sql += `\nINNER JOIN ${sources[i].tableName} ${sources[i].alias} ON ${joinConditions}`;
+      sql += `\nLEFT JOIN ${sources[i].tableName} ${sources[i].alias} ON ${joinConditions}`;
     }
 
     if (filters.length > 0) {
@@ -210,7 +257,7 @@ export default function DataViewerPage() {
         .map((f, i) => {
           let condition = "";
           const isStringOp = ["equals", "not_equals", "contains", "not_contains", "in"].includes(f.operator);
-          const aliasedCol = `t1."${f.column}"`;
+          const aliasedCol = `${sources[0].alias}."${f.column}"`;
           const col = isStringOp ? normalizeGermanExpr(aliasedCol) : aliasedCol;
           const val = isStringOp ? normalizeGermanValue(f.value) : f.value;
           switch (f.operator) {
@@ -246,7 +293,7 @@ export default function DataViewerPage() {
     }
 
     return sql;
-  }, [selectedDataSources, selectedColumns, filters, isMultiTable, joinColumns, allColumnsPerSource]);
+  }, [selectedDataSources, selectedColumns, filters, isMultiTable, joinColumns, allColumnsPerSource, columnSourceMap]);
 
   const queryMutation = useMutation({
     mutationFn: async (config: { sql: string; dataSourceIds: string[] }): Promise<QueryResult> => {
@@ -449,7 +496,7 @@ export default function DataViewerPage() {
               {isMultiTable && (
                 <div className="flex items-center gap-1 flex-wrap">
                   <Badge variant="secondary" className="text-xs" data-testid="badge-join-mode">
-                    JOIN Mode
+                    LEFT JOIN Mode
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     {joinColumns.length} common column{joinColumns.length !== 1 ? "s" : ""}
@@ -475,7 +522,7 @@ export default function DataViewerPage() {
                   <>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label>{isMultiTable ? "Common Columns" : "Columns"}</Label>
+                        <Label>Columns</Label>
                         <div className="flex gap-1">
                           <Button variant="ghost" size="sm" onClick={selectAllColumns} className="h-6 text-xs">
                             All
@@ -491,29 +538,45 @@ export default function DataViewerPage() {
                             <Skeleton key={i} className="h-6 w-full" />
                           ))}
                         </div>
-                      ) : accessibleColumns.length === 0 && isMultiTable ? (
-                        <p className="text-xs text-muted-foreground text-center py-2" data-testid="text-no-common-columns">
-                          No common columns found between the selected tables
+                      ) : isMultiTable && joinColumns.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-2" data-testid="text-no-join-columns">
+                          No common columns found between the selected tables. Tables must share at least one column name to join.
+                        </p>
+                      ) : accessibleColumns.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-2" data-testid="text-no-columns">
+                          No columns available for the selected tables
                         </p>
                       ) : (
                         <ScrollArea className="h-48 rounded-md border p-2">
                           <div className="space-y-2">
-                            {accessibleColumns.map((column) => (
-                              <div key={column.name} className="flex items-center gap-2">
-                                <Checkbox
-                                  id={column.name}
-                                  checked={selectedColumns.includes(column.name)}
-                                  onCheckedChange={(checked) => handleColumnToggle(column.name, checked as boolean)}
-                                  data-testid={`checkbox-column-${column.name}`}
-                                />
-                                <label htmlFor={column.name} className="text-sm flex-1 cursor-pointer">
-                                  {column.name}
-                                </label>
-                                <Badge variant="outline" className="text-xs">
-                                  {column.type}
-                                </Badge>
-                              </div>
-                            ))}
+                            {accessibleColumns.map((column) => {
+                              const isCommon = isMultiTable && joinColumns.includes(column.name);
+                              const ownerIds = isMultiTable ? (columnSourceMap[column.name] || []) : [];
+                              const ownerLabel = isMultiTable && !isCommon
+                                ? ownerIds.map((id) => DATA_SOURCES.find((d) => d.id === id)?.shortName || id).join(", ")
+                                : null;
+                              return (
+                                <div key={column.name} className="flex items-center gap-2">
+                                  <Checkbox
+                                    id={column.name}
+                                    checked={selectedColumns.includes(column.name)}
+                                    onCheckedChange={(checked) => handleColumnToggle(column.name, checked as boolean)}
+                                    data-testid={`checkbox-column-${column.name}`}
+                                  />
+                                  <label htmlFor={column.name} className="text-sm flex-1 cursor-pointer truncate">
+                                    {column.name}
+                                  </label>
+                                  {isMultiTable && (
+                                    <Badge variant={isCommon ? "default" : "secondary"} className="text-[10px] px-1.5 py-0 shrink-0">
+                                      {isCommon ? "all" : ownerLabel}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-xs shrink-0">
+                                    {column.type}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
                           </div>
                         </ScrollArea>
                       )}

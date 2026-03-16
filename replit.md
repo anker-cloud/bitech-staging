@@ -122,11 +122,14 @@ The platform provides a public REST API for programmatic data access:
 - **Note**: Athena does not support OFFSET, so pagination is limited to LIMIT only
 
 ### Multi-Table JOIN Query Builder
-The Data Viewer supports querying multiple data sources simultaneously using INNER JOINs:
+The Data Viewer supports querying multiple data sources simultaneously using LEFT JOINs:
 - Users can select multiple data sources via checkboxes in the sidebar
-- When multiple sources are selected, the app auto-detects common columns (intersection of column names across all selected tables)
-- These common columns become the join keys and the only filterable columns
-- The generated SQL uses table aliases (t1, t2, ...) with INNER JOIN on all common columns
+- Column picker shows ALL columns from ALL selected sources (deduplicated by name)
+- Common columns (intersection) are used as join keys; filters are restricted to common columns only
+- Each column shows a badge: "all" for common columns, or the source short name for source-specific columns
+- The table with the most selected columns becomes the LEFT (primary) table; tie-break: first selected
+- The generated SQL uses table aliases (t1, t2, ...) with LEFT JOIN on common columns
+- Type mismatches on join columns are handled with CAST(... AS VARCHAR)
 - Both the visual query builder and custom SQL editor support multi-source selection
 - Backend validates permissions for ALL selected data sources before executing
 - Row-level permission filters are applied per-source with correct table aliases
