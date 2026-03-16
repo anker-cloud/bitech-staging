@@ -171,7 +171,8 @@ export interface QueryFilter {
 }
 
 export interface QueryConfig {
-  dataSourceId: DataSourceId;
+  dataSourceId?: DataSourceId;
+  dataSourceIds?: DataSourceId[];
   selectedColumns: string[];
   filters: QueryFilter[];
   customSql?: string;
