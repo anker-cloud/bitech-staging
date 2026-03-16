@@ -565,7 +565,7 @@ export default function DataViewerPage() {
                             <p className="text-muted-foreground">Try deselecting and reselecting the source.</p>
                           </div>
                         )}
-                        <ScrollArea className="h-48 rounded-md border p-2">
+                        <div className="h-48 rounded-md border p-2 overflow-x-auto overflow-y-auto">
                           <div className="min-w-max space-y-2">
                             {accessibleColumns.map((column) => {
                               const isCommon = isMultiTable && joinColumns.includes(column.name);
@@ -596,8 +596,7 @@ export default function DataViewerPage() {
                               );
                             })}
                           </div>
-                          <ScrollBar orientation="horizontal" />
-                        </ScrollArea>
+                        </div>
                         </>
                       )}
                     </div>
