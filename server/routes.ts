@@ -555,9 +555,10 @@ export async function registerRoutes(
 
       const columns = await getDataSourceColumns(dataSourceId);
       res.json(columns);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Get columns error:", error);
-      res.status(500).json({ message: "Failed to fetch columns" });
+      const errorName = error?.name || "Unknown";
+      res.status(500).json({ message: `Failed to fetch columns for ${dataSourceId}: ${errorName}` });
     }
   });
 

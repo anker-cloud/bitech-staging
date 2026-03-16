@@ -549,18 +549,7 @@ export default function DataViewerPage() {
                             <Skeleton key={i} className="h-6 w-full" />
                           ))}
                         </div>
-                      ) : hasColumnError ? (
-                        <div className="text-xs text-center py-2 space-y-1" data-testid="text-column-error">
-                          <p className="text-destructive font-medium">Failed to load columns for:</p>
-                          {erroredSources.map((dsId) => {
-                            const ds = DATA_SOURCES.find((d) => d.id === dsId);
-                            return (
-                              <p key={dsId} className="text-destructive">{ds?.name || dsId}</p>
-                            );
-                          })}
-                          <p className="text-muted-foreground mt-1">This may be a temporary issue. Try deselecting and reselecting the source.</p>
-                        </div>
-                      ) : isMultiTable && joinColumns.length === 0 ? (
+                      ) : isMultiTable && joinColumns.length === 0 && !hasColumnError ? (
                         <p className="text-xs text-muted-foreground text-center py-2" data-testid="text-no-join-columns">
                           No common columns found between the selected tables. Tables must share at least one column name to join.
                         </p>
@@ -569,6 +558,13 @@ export default function DataViewerPage() {
                           No columns available for the selected tables
                         </p>
                       ) : (
+                        <>
+                        {hasColumnError && (
+                          <div className="text-xs rounded-md border border-destructive/50 bg-destructive/10 p-2 mb-2 space-y-0.5" data-testid="text-column-error">
+                            <p className="text-destructive font-medium">Failed to load columns for: {erroredSources.map((dsId) => DATA_SOURCES.find((d) => d.id === dsId)?.name || dsId).join(", ")}</p>
+                            <p className="text-muted-foreground">Try deselecting and reselecting the source.</p>
+                          </div>
+                        )}
                         <ScrollArea className="h-48 rounded-md border p-2">
                           <div className="space-y-2">
                             {accessibleColumns.map((column) => {
@@ -601,6 +597,7 @@ export default function DataViewerPage() {
                             })}
                           </div>
                         </ScrollArea>
+                        </>
                       )}
                     </div>
 
