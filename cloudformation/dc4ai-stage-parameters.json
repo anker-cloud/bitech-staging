@@ -1,0 +1,62 @@
+[
+  {
+    "ParameterKey": "ProjectName",
+    "ParameterValue": "dc4ai"
+  },
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "staging"
+  },
+  {
+    "ParameterKey": "VpcCidr",
+    "ParameterValue": "10.1.0.0/16"
+  },
+  {
+    "ParameterKey": "EC2InstanceType",
+    "ParameterValue": "t3.small"
+  },
+  {
+    "ParameterKey": "EC2KeyPairName",
+    "ParameterValue": "REPLACE_WITH_YOUR_KEY_PAIR_NAME"
+  },
+  {
+    "ParameterKey": "DBUsername",
+    "ParameterValue": "dc4ai_admin"
+  },
+  {
+    "ParameterKey": "DBPassword",
+    "ParameterValue": "REPLACE_WITH_YOUR_DB_PASSWORD"
+  },
+  {
+    "ParameterKey": "DBInstanceClass",
+    "ParameterValue": "db.t3.micro"
+  },
+  {
+    "ParameterKey": "CognitoUserPoolId",
+    "ParameterValue": "REPLACE_WITH_COGNITO_USER_POOL_ID"
+  },
+  {
+    "ParameterKey": "CognitoClientId",
+    "ParameterValue": "REPLACE_WITH_COGNITO_CLIENT_ID"
+  },
+  {
+    "ParameterKey": "AthenaOutputLocation",
+    "ParameterValue": "s3://bitech-pbac-data-stg/athena-post-op/"
+  },
+  {
+    "ParameterKey": "GitHubOwner",
+    "ParameterValue": "REPLACE_WITH_GITHUB_OWNER"
+  },
+  {
+    "ParameterKey": "GitHubRepo",
+    "ParameterValue": "REPLACE_WITH_GITHUB_REPO_NAME"
+  },
+  {
+    "ParameterKey": "GitHubBranch",
+    "ParameterValue": "staging"
+  },
+  {
+    "ParameterKey": "GitHubCodeStarConnectionArn",
+    "ParameterValue": "REPLACE_WITH_CODESTAR_CONNECTION_ARN"
+  }
+]
