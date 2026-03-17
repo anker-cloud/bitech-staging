@@ -97,7 +97,7 @@ export async function executeQuery(sql: string, databaseName: string): Promise<Q
     row.Data?.forEach((cell, index) => {
       const columnName = columns[index];
       if (columnName) {
-        rowData[columnName] = cell.VarCharValue;
+        rowData[columnName] = cell.VarCharValue !== undefined ? cell.VarCharValue : null;
       }
     });
     return rowData;
