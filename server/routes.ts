@@ -726,6 +726,7 @@ export async function registerRoutes(
     try {
       const apiKey = req.headers["x-api-key"] as string;
       const dataSource = req.headers["x-data-source"] as string;
+      const dataSourcesHeader = req.headers["x-data-sources"] as string | undefined;
       const tableName = req.headers["x-table"] as string | undefined;
       const acceptHeader = req.headers["accept"] as string || "application/json";
 
@@ -733,8 +734,8 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Missing x-api-key header" });
       }
 
-      if (!dataSource) {
-        return res.status(400).json({ message: "Missing x-data-source header" });
+      if (!dataSource && !dataSourcesHeader) {
+        return res.status(400).json({ message: "Missing required header: x-data-source (single source) or x-data-sources (multi-source JOIN, comma-separated)" });
       }
 
       const keyHash = hashApiKey(apiKey);
@@ -753,6 +754,191 @@ export async function registerRoutes(
       if (!role) {
         return res.status(403).json({ message: "User has no assigned role" });
       }
+
+      // ── MULTI-SOURCE LEFT JOIN PATH ───────────────────────────────────────
+      if (dataSourcesHeader) {
+        const sourceIds = dataSourcesHeader.split(",").map(s => s.trim()).filter(Boolean);
+
+        if (sourceIds.length < 2) {
+          return res.status(400).json({ message: "x-data-sources requires at least 2 comma-separated sources. For a single source use x-data-source instead." });
+        }
+
+        const resolvedSources = sourceIds.map(id => {
+          const resolvedId = DATA_SOURCE_SHORT_NAMES[id] || id;
+          const config = DATA_SOURCES.find(ds => ds.id === resolvedId);
+          return { originalId: id, resolvedId, config };
+        });
+
+        const invalidSources = resolvedSources.filter(s => !s.config);
+        if (invalidSources.length > 0) {
+          return res.status(400).json({
+            message: `Invalid data source(s): ${invalidSources.map(s => s.originalId).join(", ")}`,
+            validSources: [...DATA_SOURCES.map(ds => ds.shortName), ...DATA_SOURCES.map(ds => ds.id)],
+          });
+        }
+
+        const permissions = role.permissions as DataSourcePermission[] || [];
+
+        for (const src of resolvedSources) {
+          const perm = permissions.find(p => p.dataSourceId === src.resolvedId);
+          if (!role.isAdmin && (!perm || !perm.hasAccess)) {
+            return res.status(403).json({ message: `Access Denied!! You do not have Lake Formation permissions to access: ${src.originalId}` });
+          }
+        }
+
+        let columnsPerSource: { name: string; type: string }[][];
+        try {
+          columnsPerSource = await Promise.all(resolvedSources.map(src => getDataSourceColumns(src.resolvedId!)));
+        } catch (err) {
+          return res.status(500).json({ message: `Failed to fetch schema: ${err instanceof Error ? err.message : String(err)}` });
+        }
+
+        const colNameSets = columnsPerSource.map(cols => new Set(cols.map(c => c.name)));
+        const joinColumns = [...colNameSets[0]].filter(name => colNameSets.every(set => set.has(name)));
+
+        if (joinColumns.length === 0) {
+          return res.status(400).json({
+            message: "No common columns found between the selected data sources. Sources must share at least one column name to JOIN.",
+            sources: resolvedSources.map((src, i) => ({ id: src.resolvedId, columns: columnsPerSource[i].map(c => c.name) })),
+          });
+        }
+
+        const castColumns = new Set<string>();
+        for (const jc of joinColumns) {
+          const types = columnsPerSource.map(cols => cols.find(c => c.name === jc)?.type || "string");
+          if (types.some(t => t !== types[0])) castColumns.add(jc);
+        }
+
+        const columnSourceIndex: Record<string, number> = {};
+        for (let i = 0; i < resolvedSources.length; i++) {
+          for (const col of columnsPerSource[i]) {
+            if (!(col.name in columnSourceIndex)) columnSourceIndex[col.name] = i;
+          }
+        }
+
+        const allColumnNames = Object.keys(columnSourceIndex);
+        const aliases = resolvedSources.map((_, i) => `t${i + 1}`);
+
+        const requestedColumnsParam = req.query.columns as string | undefined;
+        let requestedColumns = requestedColumnsParam
+          ? requestedColumnsParam.split(",").map(c => c.trim()).filter(Boolean)
+          : allColumnNames;
+
+        if (!role.isAdmin) {
+          for (let i = 0; i < resolvedSources.length; i++) {
+            const src = resolvedSources[i];
+            const perm = permissions.find(p => p.dataSourceId === src.resolvedId);
+            const tablePerm = perm?.tables?.find(t => t.tableName === src.config!.tableName);
+            if (tablePerm && !tablePerm.allColumns) {
+              const allowedCols = new Set(tablePerm.columns || []);
+              for (const reqCol of requestedColumns) {
+                const ownerIdx = columnSourceIndex[reqCol];
+                if (ownerIdx === i && !joinColumns.includes(reqCol) && !allowedCols.has(reqCol)) {
+                  return res.status(403).json({
+                    message: `Access Denied!! You do not have Lake Formation permissions to access column: ${reqCol} in ${src.originalId}`,
+                  });
+                }
+              }
+              requestedColumns = requestedColumns.filter(c => columnSourceIndex[c] !== i || joinColumns.includes(c) || allowedCols.has(c));
+            }
+          }
+        }
+
+        const colAlias = (colName: string) => {
+          if (joinColumns.includes(colName)) return aliases[0];
+          const ownerIdx = columnSourceIndex[colName] ?? 0;
+          return aliases[ownerIdx];
+        };
+
+        const selectParts = requestedColumns.map(col => `${colAlias(col)}."${col.replace(/"/g, '""')}"`);
+        const activeDatabase = getActiveDatabase();
+        let sql = `SELECT ${selectParts.join(", ")}\nFROM "${resolvedSources[0].config!.tableName}" ${aliases[0]}`;
+
+        for (let i = 1; i < resolvedSources.length; i++) {
+          const conditions = joinColumns.map(jc => {
+            const needsCast = castColumns.has(jc);
+            const left = needsCast ? `CAST(${aliases[0]}."${jc}" AS VARCHAR)` : `${aliases[0]}."${jc}"`;
+            const right = needsCast ? `CAST(${aliases[i]}."${jc}" AS VARCHAR)` : `${aliases[i]}."${jc}"`;
+            return `${left} = ${right}`;
+          }).join(" AND ");
+          sql += `\nLEFT JOIN "${resolvedSources[i].config!.tableName}" ${aliases[i]} ON ${conditions}`;
+        }
+
+        const filterClauses: string[] = [];
+        const filterParams = Object.entries(req.query).filter(([key]) => !["columns", "limit"].includes(key));
+        for (const [column, value] of filterParams) {
+          if (!joinColumns.includes(column)) continue;
+          const safeValue = String(value).replace(/'/g, "''");
+          const colRef = `${aliases[0]}."${column.replace(/"/g, '""')}"`;
+          filterClauses.push(`${normalizeGermanExpr(colRef)} = '${normalizeGermanValue(safeValue)}'`);
+        }
+
+        for (let i = 0; i < resolvedSources.length; i++) {
+          const src = resolvedSources[i];
+          const perm = permissions.find(p => p.dataSourceId === src.resolvedId);
+          const tablePerm = perm?.tables?.find(t => t.tableName === src.config!.tableName);
+          if (!role.isAdmin && tablePerm && !tablePerm.allRows && tablePerm.rowFilters) {
+            for (const filter of tablePerm.rowFilters) {
+              const safeCol = filter.column.replace(/"/g, '""');
+              const safeVal = String(filter.value).replace(/'/g, "''");
+              const isStringOp = ['equals', 'not_equals', 'contains', 'in'].includes(filter.operator);
+              const colExpr = isStringOp ? normalizeGermanExpr(`${aliases[i]}."${safeCol}"`) : `${aliases[i]}."${safeCol}"`;
+              const valExpr = isStringOp ? normalizeGermanValue(safeVal) : safeVal;
+              let clause: string;
+              switch (filter.operator) {
+                case "equals": clause = `${colExpr} = '${valExpr}'`; break;
+                case "not_equals": clause = `${colExpr} != '${valExpr}'`; break;
+                case "contains": clause = `${colExpr} LIKE '%${valExpr}%'`; break;
+                case "greater_than": clause = `${aliases[i]}."${safeCol}" > '${safeVal}'`; break;
+                case "less_than": clause = `${aliases[i]}."${safeCol}" < '${safeVal}'`; break;
+                case "in": {
+                  const vals = safeVal.split(",").map(v => `'${normalizeGermanValue(v.trim())}'`).join(", ");
+                  clause = `${colExpr} IN (${vals})`;
+                  break;
+                }
+                default: clause = `${colExpr} = '${valExpr}'`;
+              }
+              filterClauses.push(clause);
+            }
+          }
+        }
+
+        const whereClause = filterClauses.length > 0 ? `WHERE ${filterClauses.join(" AND ")}` : "";
+        const limit = Math.min(parseInt(req.query.limit as string) || 100, 1000);
+        sql += `\n${whereClause}\nLIMIT ${limit}`;
+
+        const result = await executeQuery(sql, activeDatabase);
+
+        if (acceptHeader.includes("text/csv")) {
+          res.setHeader("Content-Type", "text/csv");
+          res.setHeader("Content-Disposition", "attachment; filename=data.csv");
+          if (result.rows.length === 0) return res.send("");
+          const header = result.columns.join(",");
+          const rows = result.rows.map(row =>
+            result.columns.map(col => {
+              const val = row[col];
+              if (val === null || val === undefined) return "";
+              const str = String(val);
+              return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str.replace(/"/g, '""')}"` : str;
+            }).join(",")
+          );
+          return res.send([header, ...rows].join("\n"));
+        }
+
+        return res.json({
+          meta: {
+            totalRows: result.totalRows,
+            limit,
+            joinMode: true,
+            sources: resolvedSources.map(s => s.resolvedId),
+            joinColumns,
+            executionTimeMs: result.executionTimeMs,
+            columns: result.columns,
+          },
+          data: result.rows,
+        });
+      }
+      // ── END MULTI-SOURCE PATH ─────────────────────────────────────────────
 
       const resolvedDataSourceId = DATA_SOURCE_SHORT_NAMES[dataSource] || dataSource;
       const dataSourceConfig = DATA_SOURCES.find(ds => ds.id === resolvedDataSourceId);
