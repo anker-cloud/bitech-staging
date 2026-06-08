@@ -655,8 +655,15 @@ export async function registerRoutes(
         }
       }
 
-      const result = await executeQuery(modifiedSql, getActiveDatabase());
-      res.json(result);
+      const maxRows = parseInt(process.env.QUERY_MAX_ROWS || "10000", 10) || 10000;
+      const hasLimitClause = /\bLIMIT\s+\d+/i.test(modifiedSql);
+      const limitApplied = !hasLimitClause;
+      const finalSql = hasLimitClause
+        ? modifiedSql
+        : `SELECT * FROM (${modifiedSql}) __limit_wrapper LIMIT ${maxRows}`;
+
+      const result = await executeQuery(finalSql, getActiveDatabase());
+      res.json({ ...result, limitApplied, maxRows: limitApplied ? maxRows : undefined });
     } catch (error) {
       console.error("Query execution error:", error);
       res.status(500).json({ 
