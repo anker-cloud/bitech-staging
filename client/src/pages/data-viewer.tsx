@@ -26,7 +26,7 @@ interface TableColumn {
 
 interface QueryResult {
   columns: string[];
-  rows: Record<string, unknown>[];
+  rows: (string | null)[][];
   totalRows: number;
   executionTimeMs: number;
 }
@@ -350,7 +350,7 @@ export default function DataViewerPage() {
     const { columns, rows } = queryMutation.data;
     const csvContent = [
       columns.join(","),
-      ...rows.map((row) => columns.map((col) => `"${row[col] ?? ""}"`).join(",")),
+      ...rows.map((row) => columns.map((_, i) => `"${row[i] ?? ""}"`).join(",")),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv" });
@@ -414,9 +414,10 @@ export default function DataViewerPage() {
 
   const sortedResults = useMemo(() => {
     if (!queryMutation.data?.rows || !sortColumn) return queryMutation.data?.rows || [];
+    const colIndex = queryMutation.data.columns.indexOf(sortColumn);
     return [...queryMutation.data.rows].sort((a, b) => {
-      const aVal = a[sortColumn];
-      const bVal = b[sortColumn];
+      const aVal = colIndex >= 0 ? a[colIndex] : null;
+      const bVal = colIndex >= 0 ? b[colIndex] : null;
       if (aVal === bVal) return 0;
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
@@ -810,10 +811,10 @@ export default function DataViewerPage() {
                   <TableBody>
                     {paginatedResults.map((row, rowIndex) => (
                       <TableRow key={rowIndex}>
-                        {queryMutation.data!.columns.map((column) => (
+                        {queryMutation.data!.columns.map((column, colIndex) => (
                           <TableCell key={column} className="font-mono text-sm">
-                            {row[column] !== null && row[column] !== undefined
-                              ? String(row[column])
+                            {row[colIndex] !== null && row[colIndex] !== undefined
+                              ? String(row[colIndex])
                               : <span className="text-muted-foreground italic">null</span>}
                           </TableCell>
                         ))}

@@ -919,8 +919,8 @@ export async function registerRoutes(
           if (result.rows.length === 0) return res.send("");
           const header = result.columns.join(",");
           const rows = result.rows.map(row =>
-            result.columns.map(col => {
-              const val = row[col];
+            result.columns.map((_, i) => {
+              const val = row[i];
               if (val === null || val === undefined) return "";
               const str = String(val);
               return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str.replace(/"/g, '""')}"` : str;
@@ -1060,9 +1060,9 @@ export async function registerRoutes(
         }
 
         const header = result.columns.join(",");
-        const rows = result.rows.map(row => 
-          result.columns.map(col => {
-            const val = row[col];
+        const rows = result.rows.map(row =>
+          result.columns.map((_, i) => {
+            const val = row[i];
             if (val === null || val === undefined) return "";
             const str = String(val);
             if (str.includes(",") || str.includes('"') || str.includes("\n")) {
