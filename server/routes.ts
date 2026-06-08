@@ -13,12 +13,6 @@ import { z } from "zod";
 import crypto from "crypto";
 import { normalizeGermanExpr, normalizeGermanValue } from "@shared/sql-normalize";
 
-const MAX_ROWS = Math.max(1, parseInt(process.env.QUERY_MAX_ROWS || "10000", 10) || 10000);
-
-function hasLimitClause(sql: string): boolean {
-  return /\bLIMIT\s+\d+/i.test(sql);
-}
-
 function generateApiKey(): { key: string; hash: string; prefix: string } {
   const key = `dc4ai_${crypto.randomBytes(32).toString('hex')}`;
   const hash = crypto.createHash('sha256').update(key).digest('hex');
@@ -661,17 +655,8 @@ export async function registerRoutes(
         }
       }
 
-      const limitApplied = !hasLimitClause(modifiedSql);
-      const cappedSql = limitApplied
-        ? `SELECT * FROM (${modifiedSql}) __limit_wrapper LIMIT ${MAX_ROWS}`
-        : modifiedSql;
-
-      const result = await executeQuery(cappedSql, getActiveDatabase());
-      res.json({
-        ...result,
-        limitApplied,
-        maxRows: limitApplied ? MAX_ROWS : undefined,
-      });
+      const result = await executeQuery(modifiedSql, getActiveDatabase());
+      res.json(result);
     } catch (error) {
       console.error("Query execution error:", error);
       res.status(500).json({ 
