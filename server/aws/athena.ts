@@ -20,6 +20,12 @@ export interface QueryResult {
   executionTimeMs: number;
 }
 
+export type StreamChunk =
+  | { type: 'columns'; columns: string[] }
+  | { type: 'rows'; rows: (string | null)[][]; pageIndex: number; cumulativeRows: number }
+  | { type: 'complete'; totalRows: number; executionTimeMs: number }
+  | { type: 'error'; message: string }
+
 async function waitForQueryCompletion(queryExecutionId: string): Promise<void> {
   const maxAttempts = 60;
   let attempts = 0;
@@ -63,25 +69,31 @@ export async function executeQuery(sql: string, databaseName: string): Promise<Q
 
   const startResponse = await client.send(startCommand);
   const queryExecutionId = startResponse.QueryExecutionId;
+  console.log(`[athena] submitted in ${Date.now() - startTime}ms — id: ${queryExecutionId}`);
 
   if (!queryExecutionId) {
     throw new Error("Failed to start query execution");
   }
 
   await waitForQueryCompletion(queryExecutionId);
+  console.log(`[athena] execution done in ${Date.now() - startTime}ms`);
 
   let columns: string[] = [];
   const rows: (string | null)[][] = [];
   let nextToken: string | undefined = undefined;
   let isFirstPage = true;
+  let pageCount = 0;
 
   do {
+    const pageStart = Date.now();
     const getResultsCommand = new GetQueryResultsCommand({
       QueryExecutionId: queryExecutionId,
       NextToken: nextToken,
     });
 
     const resultsResponse: GetQueryResultsCommandOutput = await client.send(getResultsCommand);
+    pageCount++;
+    console.log(`[athena] page ${pageCount} fetched in ${Date.now() - pageStart}ms (rows so far: ${rows.length})`);
     const resultSet = resultsResponse.ResultSet;
 
     if (!resultSet || !resultSet.Rows || resultSet.Rows.length === 0) {
@@ -102,6 +114,7 @@ export async function executeQuery(sql: string, databaseName: string): Promise<Q
 
     nextToken = resultsResponse.NextToken;
   } while (nextToken !== undefined);
+  console.log(`[athena] all pages done — ${rows.length} rows, ${pageCount} pages, total: ${Date.now() - startTime}ms`);
 
   if (columns.length === 0) {
     return {
@@ -118,6 +131,86 @@ export async function executeQuery(sql: string, databaseName: string): Promise<Q
     totalRows: rows.length,
     executionTimeMs: Date.now() - startTime,
   };
+}
+
+export async function* executeQueryStream(
+  sql: string,
+  databaseName: string,
+  signal?: AbortSignal
+): AsyncGenerator<StreamChunk> {
+  const startTime = Date.now();
+
+  try {
+    const startCommand = new StartQueryExecutionCommand({
+      QueryString: sql,
+      QueryExecutionContext: { Database: databaseName },
+      ResultConfiguration: { OutputLocation: outputLocation },
+    });
+
+    const startResponse = await client.send(startCommand);
+    const queryExecutionId = startResponse.QueryExecutionId;
+    console.log(`[athena:stream] submitted in ${Date.now() - startTime}ms — id: ${queryExecutionId}`);
+
+    if (!queryExecutionId) {
+      yield { type: 'error', message: 'Failed to start query execution' };
+      return;
+    }
+
+    await waitForQueryCompletion(queryExecutionId);
+    console.log(`[athena:stream] execution done in ${Date.now() - startTime}ms`);
+
+    let columns: string[] = [];
+    let nextToken: string | undefined = undefined;
+    let isFirstPage = true;
+    let pageIndex = 0;
+    let cumulativeRows = 0;
+
+    do {
+      if (signal?.aborted) return;
+
+      const getResultsCommand = new GetQueryResultsCommand({
+        QueryExecutionId: queryExecutionId,
+        NextToken: nextToken,
+      });
+
+      const resultsResponse: GetQueryResultsCommandOutput = await client.send(getResultsCommand);
+      const resultSet = resultsResponse.ResultSet;
+
+      if (!resultSet || !resultSet.Rows || resultSet.Rows.length === 0) {
+        break;
+      }
+
+      let pageRows: (string | null)[][];
+
+      if (isFirstPage) {
+        columns = resultSet.Rows[0].Data?.map(cell => cell.VarCharValue || "") ?? [];
+        isFirstPage = false;
+        pageRows = resultSet.Rows.slice(1).map(row => row.Data?.map(cell => cell.VarCharValue ?? null) ?? []);
+        yield { type: 'columns', columns };
+      } else {
+        pageRows = resultSet.Rows.map(row => row.Data?.map(cell => cell.VarCharValue ?? null) ?? []);
+      }
+
+      cumulativeRows += pageRows.length;
+      console.log(`[athena:stream] page ${pageIndex} — ${pageRows.length} rows, cumulative: ${cumulativeRows}`);
+
+      if (pageRows.length > 0) {
+        yield { type: 'rows', rows: pageRows, pageIndex, cumulativeRows };
+      }
+
+      pageIndex++;
+      nextToken = resultsResponse.NextToken;
+    } while (nextToken !== undefined);
+
+    if (columns.length === 0) {
+      yield { type: 'columns', columns: [] };
+    }
+
+    yield { type: 'complete', totalRows: cumulativeRows, executionTimeMs: Date.now() - startTime };
+    console.log(`[athena:stream] done — ${cumulativeRows} rows, ${Date.now() - startTime}ms`);
+  } catch (error) {
+    yield { type: 'error', message: error instanceof Error ? error.message : 'Query failed' };
+  }
 }
 
 export async function validateQuery(sql: string, databaseName: string): Promise<{ valid: boolean; error?: string }> {

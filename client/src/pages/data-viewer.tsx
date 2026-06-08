@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { useQueries, useMutation } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { Database, Play, Download, Code, Wand2, Plus, X, Loader2, ChevronDown, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,18 +17,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { DATA_SOURCES, filterOperators, type DataSourceId, type QueryFilter, type QueryConfig } from "@shared/schema";
 import { normalizeGermanExpr, normalizeGermanValue } from "@shared/sql-normalize";
-import { apiRequest } from "@/lib/queryClient";
 
 interface TableColumn {
   name: string;
   type: string;
-}
-
-interface QueryResult {
-  columns: string[];
-  rows: (string | null)[][];
-  totalRows: number;
-  executionTimeMs: number;
 }
 
 export default function DataViewerPage() {
@@ -306,22 +298,87 @@ export default function DataViewerPage() {
     return sql;
   }, [selectedDataSources, selectedColumns, filters, isMultiTable, joinColumns, allColumnsPerSource, columnSourceMap]);
 
-  const queryMutation = useMutation({
-    mutationFn: async (config: { sql: string; dataSourceIds: string[] }): Promise<QueryResult> => {
-      const response = await apiRequest("POST", "/api/query/execute", config);
-      return response.json();
-    },
-    onSuccess: () => {
-      setCurrentPage(1);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Query failed",
-        description: error.message,
-        variant: "destructive",
+  type StreamStatus = 'idle' | 'executing' | 'streaming' | 'complete' | 'error';
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>('idle');
+  const [streamColumns, setStreamColumns] = useState<string[]>([]);
+  const [streamRows, setStreamRows] = useState<(string | null)[][]>([]);
+  const [executionTimeMs, setExecutionTimeMs] = useState<number | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
+
+  const executeStreamingQuery = useCallback(async (sql: string, dataSourceIds: string[]) => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    setStreamStatus('executing');
+    setStreamColumns([]);
+    setStreamRows([]);
+    setExecutionTimeMs(null);
+    setStreamError(null);
+    setCurrentPage(1);
+
+    try {
+      const response = await fetch('/api/query/execute/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user?.accessToken}`,
+        },
+        body: JSON.stringify({ sql, dataSourceIds }),
+        signal: ac.signal,
       });
-    },
-  });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ message: 'Query failed' }));
+        throw new Error(err.message || 'Query failed');
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let currentEvent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            currentEvent = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            const payload = JSON.parse(line.slice(5).trim());
+            if (currentEvent === 'columns') {
+              setStreamColumns(payload.columns);
+              setStreamStatus('streaming');
+            } else if (currentEvent === 'rows') {
+              setStreamRows(prev => [...prev, ...payload.rows]);
+            } else if (currentEvent === 'complete') {
+              setExecutionTimeMs(payload.executionTimeMs);
+              setStreamStatus('complete');
+            } else if (currentEvent === 'error') {
+              throw new Error(payload.message);
+            }
+            currentEvent = '';
+          }
+        }
+      }
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      const msg = error instanceof Error ? error.message : 'Query failed';
+      setStreamError(msg);
+      setStreamStatus('error');
+      toast({ title: 'Query failed', description: msg, variant: 'destructive' });
+    }
+  }, [user?.accessToken, toast]);
 
   const handleRunQuery = () => {
     const rawSql = queryMode === "custom" ? customSql : generatedSql;
@@ -341,16 +398,15 @@ export default function DataViewerPage() {
       });
       return;
     }
-    queryMutation.mutate({ sql: rawSql, dataSourceIds: selectedDataSources });
+    executeStreamingQuery(rawSql, selectedDataSources);
   };
 
   const handleExportCsv = () => {
-    if (!queryMutation.data) return;
+    if (streamColumns.length === 0) return;
 
-    const { columns, rows } = queryMutation.data;
     const csvContent = [
-      columns.join(","),
-      ...rows.map((row) => columns.map((_, i) => `"${row[i] ?? ""}"`).join(",")),
+      streamColumns.join(","),
+      ...streamRows.map((row) => streamColumns.map((_, i) => `"${row[i] ?? ""}"`).join(",")),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv" });
@@ -413,9 +469,9 @@ export default function DataViewerPage() {
   };
 
   const sortedResults = useMemo(() => {
-    if (!queryMutation.data?.rows || !sortColumn) return queryMutation.data?.rows || [];
-    const colIndex = queryMutation.data.columns.indexOf(sortColumn);
-    return [...queryMutation.data.rows].sort((a, b) => {
+    if (streamRows.length === 0 || !sortColumn) return streamRows;
+    const colIndex = streamColumns.indexOf(sortColumn);
+    return [...streamRows].sort((a, b) => {
       const aVal = colIndex >= 0 ? a[colIndex] : null;
       const bVal = colIndex >= 0 ? b[colIndex] : null;
       if (aVal === bVal) return 0;
@@ -424,7 +480,7 @@ export default function DataViewerPage() {
       const comparison = String(aVal).localeCompare(String(bVal), undefined, { numeric: true });
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [queryMutation.data, sortColumn, sortDirection]);
+  }, [streamRows, streamColumns, sortColumn, sortDirection]);
 
   const paginatedResults = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
@@ -469,7 +525,7 @@ export default function DataViewerPage() {
           <h1 className="text-lg font-semibold">Data Viewer</h1>
         </div>
         <div className="flex items-center gap-2">
-          {queryMutation.data && (
+          {streamColumns.length > 0 && (
             <Button variant="outline" size="sm" onClick={handleExportCsv} data-testid="button-export-csv">
               <Download className="h-4 w-4 mr-2" />
               Export CSV
@@ -727,10 +783,10 @@ export default function DataViewerPage() {
             <Button
               className="w-full"
               onClick={handleRunQuery}
-              disabled={queryMutation.isPending || (!generatedSql && queryMode === "builder") || (!customSql && queryMode === "custom") || selectedDataSources.length === 0 || hasColumnError}
+              disabled={streamStatus === 'executing' || streamStatus === 'streaming' || (!generatedSql && queryMode === "builder") || (!customSql && queryMode === "custom") || selectedDataSources.length === 0 || hasColumnError}
               data-testid="button-run-query"
             >
-              {queryMutation.isPending ? (
+              {(streamStatus === 'executing' || streamStatus === 'streaming') ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Running...
@@ -746,21 +802,28 @@ export default function DataViewerPage() {
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {queryMutation.isPending ? (
+          {streamStatus === 'executing' ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="text-muted-foreground">Executing query...</p>
               </div>
             </div>
-          ) : queryMutation.data ? (
+          ) : streamColumns.length > 0 ? (
             <>
               <div className="p-4 border-b flex items-center justify-between bg-muted/30">
                 <div className="flex items-center gap-4">
-                  <Badge variant="secondary" data-testid="badge-row-count">{queryMutation.data.totalRows} rows</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    Executed in {queryMutation.data.executionTimeMs}ms
-                  </span>
+                  <Badge variant="secondary" data-testid="badge-row-count">{streamRows.length} rows</Badge>
+                  {streamStatus === 'streaming' ? (
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Execution in progress…
+                    </span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      Executed in {executionTimeMs}ms
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -772,13 +835,13 @@ export default function DataViewerPage() {
                     Previous
                   </Button>
                   <span className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
+                    Page {currentPage} of {totalPages || 1}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
+                    disabled={currentPage === totalPages || totalPages === 0}
                   >
                     Next
                   </Button>
@@ -788,7 +851,7 @@ export default function DataViewerPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {queryMutation.data.columns.map((column) => (
+                      {streamColumns.map((column) => (
                         <TableHead
                           key={column}
                           className="cursor-pointer hover-elevate"
@@ -811,7 +874,7 @@ export default function DataViewerPage() {
                   <TableBody>
                     {paginatedResults.map((row, rowIndex) => (
                       <TableRow key={rowIndex}>
-                        {queryMutation.data!.columns.map((column, colIndex) => (
+                        {streamColumns.map((column, colIndex) => (
                           <TableCell key={column} className="font-mono text-sm">
                             {row[colIndex] !== null && row[colIndex] !== undefined
                               ? String(row[colIndex])
