@@ -1031,7 +1031,7 @@ export async function registerRoutes(
         }
 
         const whereClause = filterClauses.length > 0 ? `WHERE ${filterClauses.join(" AND ")}` : "";
-        const limit = Math.min(parseInt(req.query.limit as string) || 100, 1000);
+        const limit = parseInt(req.query.limit as string) || 100;
         sql += `\n${whereClause}\nLIMIT ${limit}`;
 
         const result = await executeQuery(sql, activeDatabase);
