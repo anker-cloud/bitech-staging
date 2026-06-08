@@ -3,6 +3,7 @@ import {
   StartQueryExecutionCommand,
   GetQueryExecutionCommand,
   GetQueryResultsCommand,
+  GetQueryResultsCommandOutput,
   QueryExecutionState,
 } from "@aws-sdk/client-athena";
 
@@ -14,7 +15,7 @@ const outputLocation = process.env.ATHENA_OUTPUT_LOCATION || "s3://aws-athena-qu
 
 export interface QueryResult {
   columns: string[];
-  rows: Record<string, unknown>[];
+  rows: (string | null)[][];
   totalRows: number;
   executionTimeMs: number;
 }
@@ -70,7 +71,7 @@ export async function executeQuery(sql: string, databaseName: string): Promise<Q
   await waitForQueryCompletion(queryExecutionId);
 
   let columns: string[] = [];
-  const rows: Record<string, unknown>[] = [];
+  const rows: (string | null)[][] = [];
   let nextToken: string | undefined = undefined;
   let isFirstPage = true;
 
@@ -80,7 +81,7 @@ export async function executeQuery(sql: string, databaseName: string): Promise<Q
       NextToken: nextToken,
     });
 
-    const resultsResponse = await client.send(getResultsCommand);
+    const resultsResponse: GetQueryResultsCommandOutput = await client.send(getResultsCommand);
     const resultSet = resultsResponse.ResultSet;
 
     if (!resultSet || !resultSet.Rows || resultSet.Rows.length === 0) {
@@ -88,26 +89,14 @@ export async function executeQuery(sql: string, databaseName: string): Promise<Q
     }
 
     if (isFirstPage) {
-      const headerRow = resultSet.Rows[0];
-      columns = headerRow.Data?.map(cell => cell.VarCharValue || "") ?? [];
+      columns = resultSet.Rows[0].Data?.map(cell => cell.VarCharValue || "") ?? [];
       isFirstPage = false;
-      const dataRows = resultSet.Rows.slice(1);
-      for (const row of dataRows) {
-        const rowData: Record<string, unknown> = {};
-        row.Data?.forEach((cell, index) => {
-          const columnName = columns[index];
-          if (columnName) rowData[columnName] = cell.VarCharValue !== undefined ? cell.VarCharValue : null;
-        });
-        rows.push(rowData);
+      for (const row of resultSet.Rows.slice(1)) {
+        rows.push(row.Data?.map(cell => cell.VarCharValue ?? null) ?? []);
       }
     } else {
       for (const row of resultSet.Rows) {
-        const rowData: Record<string, unknown> = {};
-        row.Data?.forEach((cell, index) => {
-          const columnName = columns[index];
-          if (columnName) rowData[columnName] = cell.VarCharValue !== undefined ? cell.VarCharValue : null;
-        });
-        rows.push(rowData);
+        rows.push(row.Data?.map(cell => cell.VarCharValue ?? null) ?? []);
       }
     }
 
