@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { DATA_SOURCES, filterOperators, type DataSourceId, type QueryFilter, type QueryConfig } from "@shared/schema";
@@ -24,11 +25,16 @@ interface TableColumn {
   type: string;
 }
 
+const ROW_LIMIT_OPTIONS = [100, 500, 1000, 5000] as const;
+type RowLimitOption = (typeof ROW_LIMIT_OPTIONS)[number];
+
 interface QueryResult {
   columns: string[];
   rows: (string | null)[][];
   totalRows: number;
   executionTimeMs: number;
+  limitApplied?: boolean;
+  maxRows?: number;
 }
 
 export default function DataViewerPage() {
@@ -43,6 +49,8 @@ export default function DataViewerPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [rowLimit, setRowLimit] = useState<RowLimitOption>(1000);
+  const [limitBannerDismissed, setLimitBannerDismissed] = useState(false);
   const rowsPerPage = 50;
 
   const accessibleDataSources = useMemo(() => {
@@ -324,8 +332,8 @@ export default function DataViewerPage() {
   });
 
   const handleRunQuery = () => {
-    const sql = queryMode === "custom" ? customSql : generatedSql;
-    if (!sql.trim()) {
+    const rawSql = queryMode === "custom" ? customSql : generatedSql;
+    if (!rawSql.trim()) {
       toast({
         title: "No query to run",
         description: "Please build a query or enter custom SQL",
@@ -341,6 +349,9 @@ export default function DataViewerPage() {
       });
       return;
     }
+    const hasLimit = /\bLIMIT\s+\d+/i.test(rawSql);
+    const sql = hasLimit ? rawSql : `${rawSql}\nLIMIT ${rowLimit}`;
+    setLimitBannerDismissed(false);
     queryMutation.mutate({ sql, dataSourceIds: selectedDataSources });
   };
 
@@ -724,6 +735,26 @@ export default function DataViewerPage() {
                 </pre>
               </div>
             )}
+            <div className="flex items-center gap-2">
+              <Label htmlFor="row-limit-select" className="text-xs text-muted-foreground whitespace-nowrap">
+                Row limit
+              </Label>
+              <Select
+                value={String(rowLimit)}
+                onValueChange={(value) => setRowLimit(Number(value) as RowLimitOption)}
+              >
+                <SelectTrigger id="row-limit-select" className="h-8 flex-1" data-testid="select-row-limit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROW_LIMIT_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option.toLocaleString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               className="w-full"
               onClick={handleRunQuery}
@@ -784,6 +815,25 @@ export default function DataViewerPage() {
                   </Button>
                 </div>
               </div>
+              {queryMutation.data.limitApplied && !limitBannerDismissed && (
+                <Alert className="mx-4 mt-3 mb-0 border-yellow-400 bg-yellow-50 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200 dark:border-yellow-600" data-testid="alert-limit-applied">
+                  <AlertDescription className="flex items-center justify-between gap-2">
+                    <span>
+                      Query returned the first {(queryMutation.data.maxRows ?? rowLimit).toLocaleString()} rows. Add a LIMIT clause or reduce the row limit to see different results.
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 shrink-0 text-yellow-800 hover:bg-yellow-100 dark:text-yellow-200 dark:hover:bg-yellow-900"
+                      onClick={() => setLimitBannerDismissed(true)}
+                      aria-label="Dismiss"
+                      data-testid="button-dismiss-limit-banner"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
               <ScrollArea className="flex-1">
                 <Table>
                   <TableHeader>
