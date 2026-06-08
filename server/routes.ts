@@ -939,7 +939,9 @@ export async function registerRoutes(
             executionTimeMs: result.executionTimeMs,
             columns: result.columns,
           },
-          data: result.rows,
+          data: result.rows.map(row =>
+            Object.fromEntries(result.columns.map((col, i) => [col, row[i]]))
+          ),
         });
       }
       // ── END MULTI-SOURCE PATH ─────────────────────────────────────────────
@@ -1084,7 +1086,9 @@ export async function registerRoutes(
           executionTimeMs: result.executionTimeMs,
           columns: result.columns,
         },
-        data: result.rows,
+        data: result.rows.map(row =>
+          Object.fromEntries(result.columns.map((col, i) => [col, row[i]]))
+        ),
       });
     } catch (error) {
       console.error("API fetch error:", error);
