@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -305,6 +306,7 @@ export default function DataViewerPage() {
   const [executionTimeMs, setExecutionTimeMs] = useState<number | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const isStreamingActive = streamStatus === 'executing' || streamStatus === 'streaming';
 
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
@@ -526,10 +528,30 @@ export default function DataViewerPage() {
         </div>
         <div className="flex items-center gap-2">
           {streamColumns.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleExportCsv} data-testid="button-export-csv">
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={isStreamingActive ? "cursor-not-allowed" : undefined}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportCsv}
+                      disabled={isStreamingActive}
+                      data-testid="button-export-csv"
+                      className={isStreamingActive ? "pointer-events-none" : undefined}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isStreamingActive && (
+                  <TooltipContent>
+                    Export will be available once the Query Execution is complete
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
           <Button
             variant="ghost"
